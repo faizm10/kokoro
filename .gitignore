@@ -9,6 +9,9 @@
 .env*
 !.env.example
 
+# local database
+/data
+
 # logs and system files
 *.log
 .DS_Store
