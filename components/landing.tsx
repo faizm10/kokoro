@@ -2,12 +2,13 @@
 
 import { motion } from "framer-motion";
 import { ArrowDown } from "lucide-react";
+import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
 import { GoogleMark } from "@/components/google-mark";
 
 function signInWithGoogle() {
-  window.location.href = "/api/auth/signin/google?callbackUrl=/dashboard";
+  void signIn("google", { redirectTo: "/dashboard" });
 }
 
 export function Landing() {
