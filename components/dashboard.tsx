@@ -18,15 +18,21 @@ const navItems = [
   { label: "settings", icon: Settings },
 ];
 
-const notes = [
-  { time: "11:42 pm", text: "there is a different kind of focus after everyone goes quiet." },
-  { time: "4:18 pm", text: "make the first version smaller than the fear around it." },
-  { time: "9:07 am", text: "I want to leave more room between deciding and reacting." },
-];
+function formatDashboardDate(date: Date) {
+  return {
+    weekday: date
+      .toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+      .toUpperCase(),
+    reflection: date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+    greeting:
+      date.getHours() < 12 ? "good morning." : date.getHours() < 18 ? "good afternoon." : "good evening.",
+  };
+}
 
 export function Dashboard() {
   const [quickNote, setQuickNote] = useState("");
   const [saved, setSaved] = useState(false);
+  const today = formatDashboardDate(new Date());
 
   function saveQuickNote() {
     if (!quickNote.trim()) return;
@@ -81,8 +87,8 @@ export function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          <p className="text-xs tracking-[0.08em] text-stone">WEDNESDAY, JULY 8</p>
-          <h1 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal tracking-[-0.045em]">good evening.</h1>
+          <p className="text-xs tracking-[0.08em] text-stone">{today.weekday}</p>
+          <h1 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal tracking-[-0.045em]">{today.greeting}</h1>
           <p className="mt-3 font-hand text-lg text-olive">what is still with you?</p>
         </motion.div>
 
@@ -112,7 +118,7 @@ export function Dashboard() {
               <CardHeader>
                 <div>
                   <p className="text-xs tracking-[0.08em] text-stone">TODAY’S REFLECTION</p>
-                  <CardTitle className="mt-2 text-base">July 8, 2026</CardTitle>
+                  <CardTitle className="mt-2 text-base">{today.reflection}</CardTitle>
                 </div>
                 <span className="font-hand text-sm text-stone">take your time</span>
               </CardHeader>
@@ -139,20 +145,9 @@ export function Dashboard() {
                 <CardTitle>thought threads</CardTitle>
                 <Network className="size-4 text-stone" strokeWidth={1.5} />
               </CardHeader>
-              <div className="mt-6 flex flex-wrap gap-2">
-                {["career", "school", "ideas", "stress", "people"].map((tag, index) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className={cn(
-                      "rounded-full border border-border px-3 py-1.5 text-xs text-olive transition-colors hover:bg-secondary",
-                      index === 2 && "border-[#c7ccd2] text-primary",
-                    )}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
+              <p className="mt-8 text-sm leading-6 text-stone">
+                threads will gather here as your notes start to connect.
+              </p>
             </Card>
 
             <Card className="p-6">
@@ -161,9 +156,9 @@ export function Dashboard() {
                 <Sparkles className="size-4 text-primary" strokeWidth={1.5} />
               </CardHeader>
               <p className="mt-8 font-hand text-[22px] leading-8 text-olive">
-                you often write about momentum after late nights.
+                write a little first. patterns arrive later.
               </p>
-              <p className="mt-5 text-xs leading-5 text-stone">noticed across 7 notes this month</p>
+              <p className="mt-5 text-xs leading-5 text-stone">nothing to notice yet</p>
             </Card>
 
             <Card id="archive" className="p-6">
@@ -171,14 +166,9 @@ export function Dashboard() {
                 <CardTitle>recent notes</CardTitle>
                 <a href="#archive" className="text-xs text-primary hover:underline">all notes</a>
               </CardHeader>
-              <div className="mt-4 divide-y divide-border">
-                {notes.map((note) => (
-                  <article key={note.time} className="py-5 first:pt-3 last:pb-1">
-                    <time className="text-[10px] tracking-[0.06em] text-stone">{note.time}</time>
-                    <p className="mt-2 text-sm leading-6 text-olive">{note.text}</p>
-                  </article>
-                ))}
-              </div>
+              <p className="mt-8 text-sm leading-6 text-stone">
+                your recent notes will appear here.
+              </p>
             </Card>
           </div>
         </div>
