@@ -3,7 +3,80 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { notes, threads, users } from "@/db/schema";
+import { notes, notesToThreads, threads, users } from "@/db/schema";
+
+const threadKeywordGroups = [
+  {
+    name: "focus",
+    keywords: ["focus", "work", "build", "ship", "task", "project", "study", "learn", "finish", "progress"],
+  },
+  {
+    name: "relationships",
+    keywords: ["friend", "family", "partner", "love", "call", "text", "people", "relationship", "together"],
+  },
+  {
+    name: "health",
+    keywords: ["sleep", "tired", "energy", "body", "walk", "run", "gym", "food", "health", "rest"],
+  },
+  {
+    name: "money",
+    keywords: ["money", "budget", "rent", "bill", "paid", "pay", "cost", "spend", "save"],
+  },
+  {
+    name: "feelings",
+    keywords: ["feel", "feeling", "sad", "happy", "anxious", "angry", "scared", "calm", "heavy"],
+  },
+  {
+    name: "planning",
+    keywords: ["plan", "tomorrow", "next", "schedule", "organize", "need", "should", "remember"],
+  },
+  {
+    name: "creativity",
+    keywords: ["idea", "write", "draw", "music", "design", "create", "story", "art"],
+  },
+];
+
+const stopWords = new Set([
+  "about",
+  "after",
+  "again",
+  "also",
+  "because",
+  "been",
+  "being",
+  "could",
+  "does",
+  "done",
+  "down",
+  "first",
+  "from",
+  "have",
+  "just",
+  "like",
+  "little",
+  "more",
+  "need",
+  "one",
+  "only",
+  "really",
+  "should",
+  "some",
+  "that",
+  "their",
+  "there",
+  "thing",
+  "this",
+  "through",
+  "today",
+  "together",
+  "want",
+  "what",
+  "when",
+  "where",
+  "with",
+  "would",
+  "your",
+]);
 
 export async function ensureUser(profile: { email: string; name?: string | null; image?: string | null }) {
   const existing = await db.query.users.findFirst({
@@ -40,7 +113,69 @@ export async function createNote(input: {
   if (!note.body) throw new Error("A note cannot be empty.");
 
   await db.insert(notes).values(note);
+  await connectNoteToThreads(note);
   return note;
+}
+
+function extractThreadNames(body: string) {
+  const normalized = body.toLowerCase();
+  const words: string[] = normalized.match(/[a-z][a-z'-]{2,}/g) ?? [];
+  const matchedGroups = threadKeywordGroups
+    .filter((group) => group.keywords.some((keyword) => words.includes(keyword)))
+    .map((group) => group.name);
+  const wordCounts = new Map<string, number>();
+
+  for (const word of words) {
+    const clean = word.replace(/'s$/, "");
+    if (clean.length < 4 || stopWords.has(clean)) continue;
+    wordCounts.set(clean, (wordCounts.get(clean) ?? 0) + 1);
+  }
+
+  const fallbackWords = [...wordCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([word]) => word)
+    .slice(0, 2);
+
+  const threadNames = [...new Set([...matchedGroups, ...fallbackWords])].slice(0, 3);
+  return threadNames.length > 0 ? threadNames : ["loose thoughts"];
+}
+
+async function findOrCreateThread(userId: string, name: string) {
+  const existing = await db.query.threads.findFirst({
+    where: and(
+      eq(threads.userId, userId),
+      eq(threads.name, name),
+    ),
+  });
+
+  if (existing) return existing;
+
+  const thread = {
+    id: randomUUID(),
+    userId,
+    name,
+    description: `Notes that seem connected to ${name}.`,
+  };
+
+  await db.insert(threads).values(thread);
+  return thread;
+}
+
+async function connectNoteToThreads(note: { id: string; userId: string; body: string }) {
+  const threadNames = extractThreadNames(note.body);
+
+  for (const [index, name] of threadNames.entries()) {
+    const thread = await findOrCreateThread(note.userId, name);
+
+    await db
+      .insert(notesToThreads)
+      .values({
+        noteId: note.id,
+        threadId: thread.id,
+        confidence: Math.max(64, 96 - index * 10),
+      })
+      .onConflictDoNothing();
+  }
 }
 
 export function getRecentNotes(userId: string, limit = 10) {
@@ -48,6 +183,15 @@ export function getRecentNotes(userId: string, limit = 10) {
     where: eq(notes.userId, userId),
     orderBy: [desc(notes.createdAt)],
     limit,
+  });
+}
+
+export function getNoteById(userId: string, noteId: string) {
+  return db.query.notes.findFirst({
+    where: and(
+      eq(notes.userId, userId),
+      eq(notes.id, noteId),
+    ),
   });
 }
 
@@ -69,4 +213,52 @@ export function getThreads(userId: string) {
       noteLinks: true,
     },
   });
+}
+
+export async function getMindMap(userId: string) {
+  const recentNotes = await db.query.notes.findMany({
+    where: eq(notes.userId, userId),
+    orderBy: [desc(notes.createdAt)],
+    limit: 50,
+    with: {
+      threadLinks: true,
+    },
+  });
+
+  for (const note of recentNotes) {
+    if (note.threadLinks.length === 0) {
+      await connectNoteToThreads(note);
+    }
+  }
+
+  const threadRows = await db.query.threads.findMany({
+    where: eq(threads.userId, userId),
+    orderBy: [desc(threads.updatedAt)],
+    with: {
+      noteLinks: {
+        with: {
+          note: true,
+        },
+      },
+    },
+  });
+
+  return threadRows
+    .map((thread) => ({
+      id: thread.id,
+      name: thread.name,
+      description: thread.description,
+      noteCount: thread.noteLinks.length,
+      notes: thread.noteLinks
+        .map((link) => ({
+          id: link.note.id,
+          body: link.note.body,
+          confidence: link.confidence,
+          createdAt: link.note.createdAt,
+        }))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, 4),
+    }))
+    .filter((thread) => thread.noteCount > 0)
+    .slice(0, 8);
 }
