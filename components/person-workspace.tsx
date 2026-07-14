@@ -20,7 +20,19 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import type { AssistantAnswer, AssistantTier } from "@/lib/assistant";
 import type { ImportantDateDTO, InteractionDTO, PersonDetailDTO } from "@/lib/serialize";
 import { cn } from "@/lib/utils";
@@ -34,9 +46,13 @@ const SOURCE_OPTIONS = [
   "group setting",
 ];
 
+const labelClass = "mb-1 block font-hand text-[14px] text-stone";
 const fieldClass =
-  "w-full rounded-[10px] border border-border bg-background/60 px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-stone/60 focus:border-ring focus:ring-2 focus:ring-ring/30";
-const labelClass = "mb-1.5 block text-[11px] tracking-[0.08em] text-stone/80";
+  "h-auto w-full rounded-none border-0 border-b border-[#d8d5cb] bg-transparent px-0 py-2 text-[15px] shadow-none outline-none placeholder:text-stone/45 focus-visible:border-primary focus-visible:ring-0";
+const notePaper =
+  "relative overflow-hidden rounded-[4px] border border-[#e2dfd4] bg-[#faf9f5] before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-[#d9c7b6]";
+const ruledArea =
+  "min-h-[7.5rem] w-full resize-none border-0 bg-transparent px-0 py-1 text-[15px] leading-7 text-foreground outline-none placeholder:text-stone/45 [background-image:repeating-linear-gradient(transparent,transparent_27px,rgba(222,220,210,0.55)_28px)] [background-position:0_7px]";
 
 const TIER_LABEL: Record<AssistantTier, string> = {
   "directly-stated": "directly stated",
@@ -115,7 +131,9 @@ function draftFrom(interaction: InteractionDTO): InteractionDraft {
 
 function draftToPayload(draft: InteractionDraft) {
   return {
-    occurredAt: new Date(draft.occurredAt).toISOString(),
+    occurredAt: draft.occurredAt
+      ? new Date(draft.occurredAt).toISOString()
+      : new Date().toISOString(),
     source: draft.source,
     context: draft.context || null,
     facts: draft.facts,
@@ -147,109 +165,106 @@ function InteractionForm({
   }
 
   return (
-    <form onSubmit={handle} className="grid gap-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={labelClass}>WHEN</label>
-          <input
-            type="datetime-local"
-            className={fieldClass}
+    <form onSubmit={handle} className={cn(notePaper, "grid gap-6 px-5 py-5 sm:px-6 sm:py-6")}>
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-4 border-b border-[#e4e1d7] pb-4">
+        <div className="min-w-[180px] flex-1">
+          <Label className={labelClass}>when</Label>
+          <DateTimePicker
             value={draft.occurredAt}
-            onChange={(e) => setDraft((d) => ({ ...d, occurredAt: e.target.value }))}
+            onChange={(occurredAt) => setDraft((d) => ({ ...d, occurredAt }))}
+            className="h-auto justify-start rounded-none border-0 border-b border-[#d8d5cb] bg-transparent px-0 py-2 shadow-none hover:bg-transparent"
           />
         </div>
-        <div>
-          <label className={labelClass}>SOURCE</label>
-          <select
-            className={fieldClass}
+        <div className="min-w-[180px] flex-1">
+          <Label className={labelClass}>how it happened</Label>
+          <Select
             value={draft.source}
-            onChange={(e) => setDraft((d) => ({ ...d, source: e.target.value }))}
+            onValueChange={(source) => setDraft((d) => ({ ...d, source }))}
           >
-            {SOURCE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className={cn(fieldClass, "[&>svg]:opacity-50")}>
+              <SelectValue placeholder="choose one" />
+            </SelectTrigger>
+            <SelectContent className="rounded-[12px] border-border bg-card">
+              {SOURCE_OPTIONS.map((option) => (
+                <SelectItem key={option} value={option} className="rounded-[8px]">
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       <div>
-        <label className={labelClass}>CONTEXT (OPTIONAL)</label>
-        <input
+        <Label className={labelClass}>where / why, if it helps</Label>
+        <Input
           className={fieldClass}
           value={draft.context}
           onChange={(e) => setDraft((d) => ({ ...d, context: e.target.value }))}
-          placeholder="where you were, what prompted it"
+          placeholder="over coffee, after class…"
         />
       </div>
 
       <div>
-        <label className={labelClass}>
-          WHAT THEY SAID OR DID <span className="text-stone/60">— directly stated</span>
-        </label>
-        <div className="rounded-[10px] border border-border bg-background/60 px-3 py-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
-          <Textarea
-            value={draft.facts}
-            onChange={(e) => setDraft((d) => ({ ...d, facts: e.target.value }))}
-            placeholder="stick to what actually happened or was said"
-            className="min-h-20 text-sm"
-          />
-        </div>
+        <Label className={labelClass}>what they said or did</Label>
+        <p className="mb-2 text-[12px] text-stone/65">stick to what actually happened — this is the note itself.</p>
+        <Textarea
+          value={draft.facts}
+          onChange={(e) => setDraft((d) => ({ ...d, facts: e.target.value }))}
+          placeholder="write freely…"
+          className={ruledArea}
+        />
       </div>
 
       <div>
-        <label className={labelClass}>
-          YOUR READ (OPTIONAL) <span className="text-stone/60">— your own interpretation</span>
-        </label>
-        <div className="rounded-[10px] border border-border bg-background/60 px-3 py-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
-          <Textarea
-            value={draft.interpretation}
-            onChange={(e) => setDraft((d) => ({ ...d, interpretation: e.target.value }))}
-            placeholder="kept separate from the facts on purpose"
-            className="min-h-16 text-sm"
-          />
-        </div>
+        <Label className={labelClass}>your private read</Label>
+        <p className="mb-2 text-[12px] text-stone/65">optional. kept separate from the facts on purpose.</p>
+        <Textarea
+          value={draft.interpretation}
+          onChange={(e) => setDraft((d) => ({ ...d, interpretation: e.target.value }))}
+          placeholder="what you made of it…"
+          className={cn(ruledArea, "min-h-[4.5rem]")}
+        />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         <div>
-          <label className={labelClass}>TOPICS (COMMA SEPARATED)</label>
-          <input
+          <Label className={labelClass}>topics</Label>
+          <Input
             className={fieldClass}
             value={draft.topics}
             onChange={(e) => setDraft((d) => ({ ...d, topics: e.target.value }))}
-            placeholder="e.g. climbing, new job"
+            placeholder="climbing, new job…"
           />
         </div>
         <div>
-          <label className={labelClass}>TAGS (COMMA SEPARATED)</label>
-          <input
+          <Label className={labelClass}>tags</Label>
+          <Input
             className={fieldClass}
             value={draft.tags}
             onChange={(e) => setDraft((d) => ({ ...d, tags: e.target.value }))}
-            placeholder="e.g. work, catch-up"
+            placeholder="work, catch-up…"
           />
         </div>
       </div>
 
       <div>
-        <label className={labelClass}>FOLLOW-UP YOU OWE (OPTIONAL)</label>
-        <input
+        <Label className={labelClass}>a follow-up you owe</Label>
+        <Input
           className={fieldClass}
           value={draft.followUp}
           onChange={(e) => setDraft((d) => ({ ...d, followUp: e.target.value }))}
-          placeholder="e.g. send them the article I mentioned"
+          placeholder="send that article…"
         />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pt-1">
         <Button type="submit" disabled={!draft.facts.trim() || submitting}>
-          {submitting ? "saving" : submitLabel}
+          {submitting ? "saving…" : submitLabel}
         </Button>
         {onCancel ? (
           <Button type="button" variant="ghost" onClick={onCancel}>
-            cancel
+            never mind
           </Button>
         ) : null}
       </div>
@@ -550,7 +565,7 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
   ];
 
   return (
-    <main className="min-h-screen bg-background px-5 py-8 sm:px-8 sm:py-12">
+    <main className="min-h-screen bg-[rgba(245,244,237,0.72)] px-5 py-8 sm:px-8 sm:py-12">
       <div className="mx-auto max-w-[1180px]">
         <Link
           href="/people"
@@ -566,21 +581,21 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         >
-          <Card className="mt-6 p-6 sm:p-7">
+          <Card className="mt-6 border-[#e2dfd4] bg-[#faf9f5]/92 p-6 shadow-[0_14px_40px_rgba(20,20,19,0.05)] sm:p-7">
             {editingProfile ? (
               <div className="grid gap-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className={labelClass}>NAME</label>
-                    <input
+                    <Label className={labelClass}>NAME</Label>
+                    <Input
                       className={fieldClass}
                       value={profileDraft.name}
                       onChange={(e) => setProfileDraft((d) => ({ ...d, name: e.target.value }))}
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>RELATIONSHIP</label>
-                    <input
+                    <Label className={labelClass}>RELATIONSHIP</Label>
+                    <Input
                       className={fieldClass}
                       value={profileDraft.relationship}
                       onChange={(e) => setProfileDraft((d) => ({ ...d, relationship: e.target.value }))}
@@ -588,25 +603,25 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                   </div>
                 </div>
                 <div>
-                  <label className={labelClass}>HOW WE MET</label>
-                  <input
+                  <Label className={labelClass}>HOW WE MET</Label>
+                  <Input
                     className={fieldClass}
                     value={profileDraft.howWeMet}
                     onChange={(e) => setProfileDraft((d) => ({ ...d, howWeMet: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>TAGS (COMMA SEPARATED)</label>
-                  <input
+                  <Label className={labelClass}>TAGS (COMMA SEPARATED)</Label>
+                  <Input
                     className={fieldClass}
                     value={profileDraft.tags}
                     onChange={(e) => setProfileDraft((d) => ({ ...d, tags: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>
+                  <Label className={labelClass}>
                     HOW YOU SEE THE RELATIONSHIP <span className="text-stone/60">— your words</span>
-                  </label>
+                  </Label>
                   <div className="rounded-[10px] border border-border bg-background/60 px-3 py-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
                     <Textarea
                       value={profileDraft.summary}
@@ -628,13 +643,15 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  <div className="flex size-14 items-center justify-center rounded-full border border-border bg-secondary/60 text-lg text-olive">
-                    {person.name
-                      .split(/\s+/)
-                      .slice(0, 2)
-                      .map((p) => p.slice(0, 1).toUpperCase())
-                      .join("") || "?"}
-                  </div>
+                  <Avatar className="size-14 border border-border">
+                    <AvatarFallback className="bg-secondary/60 text-lg text-olive">
+                      {person.name
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((p) => p.slice(0, 1).toUpperCase())
+                        .join("") || "?"}
+                    </AvatarFallback>
+                  </Avatar>
                   <div>
                     <h1 className="text-[clamp(1.6rem,3vw,2.4rem)] font-normal tracking-[-0.04em]">
                       {person.name}
@@ -648,12 +665,13 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                     {person.tags.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {person.tags.map((tag) => (
-                          <span
+                          <Badge
                             key={tag}
-                            className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] text-secondary-foreground"
+                            variant="secondary"
+                            className="rounded-full px-2.5 py-0.5 text-[11px] font-normal"
                           >
                             {tag}
-                          </span>
+                          </Badge>
                         ))}
                       </div>
                     ) : null}
@@ -691,12 +709,15 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
         <div className="mt-5 grid items-start gap-5 xl:grid-cols-[1.4fr_0.9fr]">
           {/* Left: timeline */}
           <div className="grid gap-5">
-            <Card className="p-6">
+            <Card className="border-[#e2dfd4] bg-[#faf9f5]/92 p-6 shadow-[0_14px_40px_rgba(20,20,19,0.05)]">
               <CardHeader>
-                <CardTitle>timeline</CardTitle>
+                <div>
+                  <CardTitle className="font-hand text-base font-normal text-olive">timeline</CardTitle>
+                  <p className="mt-1 text-[12px] text-stone/70">entries in the order you lived them</p>
+                </div>
                 <Button type="button" variant="secondary" onClick={() => setAdding((v) => !v)}>
                   <Plus className="size-4" strokeWidth={1.5} />
-                  add entry
+                  {adding ? "close" : "add entry"}
                 </Button>
               </CardHeader>
 
@@ -708,7 +729,7 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="mt-5 rounded-[12px] border border-border bg-background/40 p-4">
+                    <div className="mt-5">
                       <InteractionForm
                         draft={addDraft}
                         setDraft={(updater) => setAddDraft(updater)}
@@ -724,12 +745,12 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
               </AnimatePresence>
 
               {/* Search + filters */}
-              <div className="mt-5 space-y-3">
-                <input
+              <div className="mt-6 space-y-3">
+                <Input
                   className={fieldClass}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="search these notes…"
+                  placeholder="find a word in these notes…"
                   aria-label="Search notes"
                 />
                 {(allSources.length > 1 || sharedTopics.length > 0) ? (
@@ -767,7 +788,7 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
 
               {/* Entries */}
               {filtered.length > 0 ? (
-                <ul className="mt-5 space-y-4">
+                <ul className="mt-2 divide-y divide-[#e4e1d7]">
                   {filtered.map((interaction) => (
                     <li
                       key={interaction.id}
@@ -776,8 +797,8 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                         else timelineRefs.current.delete(interaction.id);
                       }}
                       className={cn(
-                        "rounded-[12px] border border-border bg-background/40 p-4 transition-colors",
-                        highlightId === interaction.id && "border-ring bg-primary/5",
+                        "relative py-5 pl-4 transition-colors before:absolute before:inset-y-5 before:left-0 before:w-[2px] before:rounded-full before:bg-[#d9c7b6]",
+                        highlightId === interaction.id && "bg-primary/[0.04]",
                       )}
                     >
                       {editingId === interaction.id ? (
@@ -794,9 +815,7 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="text-xs text-stone">{formatDay(interaction.occurredAt)}</p>
-                              <p className="mt-0.5 text-[11px] tracking-[0.05em] text-stone/70">
-                                {interaction.source}
-                              </p>
+                              <p className="mt-0.5 font-hand text-[13px] text-olive">{interaction.source}</p>
                             </div>
                             <div className="flex items-center gap-1">
                               <button
@@ -825,15 +844,13 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                             <p className="mt-3 text-[13px] italic text-stone">{interaction.context}</p>
                           ) : null}
 
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">
+                          <p className="mt-2 whitespace-pre-wrap text-[15px] leading-7 text-foreground">
                             {interaction.facts}
                           </p>
 
                           {interaction.interpretation ? (
-                            <div className="mt-3 border-l-2 border-border pl-3">
-                              <p className="text-[10px] tracking-[0.06em] text-stone/70 uppercase">
-                                your read
-                              </p>
+                            <div className="mt-3 border-l-2 border-[#d8d5cb] pl-3">
+                              <p className="font-hand text-[13px] text-olive">your read</p>
                               <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-6 text-stone">
                                 {interaction.interpretation}
                               </p>
@@ -847,7 +864,7 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                                   key={`t-${topic}`}
                                   type="button"
                                   onClick={() => setTagFilter((c) => (c === topic ? null : topic))}
-                                  className="rounded-full bg-secondary/70 px-2 py-0.5 text-[11px] text-secondary-foreground hover:bg-secondary"
+                                  className="rounded-full bg-[#efece3] px-2 py-0.5 text-[11px] text-olive hover:bg-secondary"
                                 >
                                   {topic}
                                 </button>
@@ -869,7 +886,7 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                             <button
                               type="button"
                               onClick={() => void toggleFollowUp(interaction)}
-                              className="mt-3 flex w-full items-center gap-2 rounded-[8px] border border-border bg-card px-3 py-2 text-left text-[13px] transition-colors hover:border-ring/50"
+                              className="mt-3 flex w-full items-center gap-2 border-b border-[#e4e1d7] px-0 py-2 text-left text-[13px] transition-colors hover:border-primary/40"
                             >
                               <span
                                 className={cn(
@@ -892,9 +909,9 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                   ))}
                 </ul>
               ) : (
-                <p className="mt-6 text-sm leading-6 text-stone">
+                <p className="mt-6 font-hand text-[16px] leading-7 text-olive">
                   {person.interactions.length === 0
-                    ? "no entries yet. add the first thing you learned."
+                    ? "this page is still blank — write the first thing you learned."
                     : "nothing matches your search or filters."}
                 </p>
               )}
@@ -947,8 +964,8 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
               </div>
 
               <form onSubmit={ask} className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-                <input
-                  className={fieldClass}
+                <Input
+                  className={cn(fieldClass, "flex-1")}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   placeholder="ask about these notes…"
@@ -1034,19 +1051,19 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
 
               {addingDate ? (
                 <form onSubmit={addDate} className="mt-4 grid gap-3">
-                  <input
+                  <Input
                     className={fieldClass}
                     value={dateForm.label}
                     onChange={(e) => setDateForm((f) => ({ ...f, label: e.target.value }))}
                     placeholder="label — e.g. birthday"
                   />
-                  <input
+                  <Input
                     type="date"
                     className={fieldClass}
                     value={dateForm.dateText}
                     onChange={(e) => setDateForm((f) => ({ ...f, dateText: e.target.value }))}
                   />
-                  <input
+                  <Input
                     className={fieldClass}
                     value={dateForm.note}
                     onChange={(e) => setDateForm((f) => ({ ...f, note: e.target.value }))}
