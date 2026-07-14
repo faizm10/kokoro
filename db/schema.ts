@@ -86,10 +86,108 @@ export const insights = sqliteTable(
   (table) => [index("insights_user_created_idx").on(table.userId, table.createdAt)],
 );
 
+export const people = sqliteTable(
+  "people",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    relationship: text("relationship"),
+    howWeMet: text("how_we_met"),
+    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+    // My own, hand-written understanding of the relationship — never AI-generated.
+    summary: text("summary"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [index("people_user_idx").on(table.userId)],
+);
+
+export const interactions = sqliteTable(
+  "interactions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    occurredAt: integer("occurred_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    context: text("context"),
+    // Where the information came from, e.g. "in-person conversation", "message they sent me".
+    source: text("source").notNull().default("in-person conversation"),
+    // Directly stated information — what they actually said or did.
+    facts: text("facts").notNull(),
+    // My own interpretation — kept separate from facts on purpose.
+    interpretation: text("interpretation"),
+    topics: text("topics", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+    followUp: text("follow_up"),
+    followUpDone: integer("follow_up_done", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [
+    index("interactions_person_occurred_idx").on(table.personId, table.occurredAt),
+    index("interactions_user_idx").on(table.userId),
+  ],
+);
+
+export const importantDates = sqliteTable(
+  "important_dates",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    // Stored as an ISO date string (YYYY-MM-DD); may recur yearly (e.g. a birthday).
+    dateText: text("date_text").notNull(),
+    note: text("note"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [index("important_dates_person_idx").on(table.personId)],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   notes: many(notes),
   threads: many(threads),
   insights: many(insights),
+  people: many(people),
+}));
+
+export const peopleRelations = relations(people, ({ one, many }) => ({
+  user: one(users, { fields: [people.userId], references: [users.id] }),
+  interactions: many(interactions),
+  importantDates: many(importantDates),
+}));
+
+export const interactionsRelations = relations(interactions, ({ one }) => ({
+  user: one(users, { fields: [interactions.userId], references: [users.id] }),
+  person: one(people, { fields: [interactions.personId], references: [people.id] }),
+}));
+
+export const importantDatesRelations = relations(importantDates, ({ one }) => ({
+  user: one(users, { fields: [importantDates.userId], references: [users.id] }),
+  person: one(people, { fields: [importantDates.personId], references: [people.id] }),
 }));
 
 export const notesRelations = relations(notes, ({ one, many }) => ({
