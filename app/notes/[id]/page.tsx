@@ -42,7 +42,7 @@ export default async function NotePage({ params }: NotePageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-background px-5 py-8 sm:px-8 sm:py-12">
+    <main className="min-h-screen bg-[rgba(245,244,237,0.82)] px-5 py-8 sm:px-8 sm:py-12">
       <div className="mx-auto max-w-[920px]">
         <Link
           href="/dashboard#archive"
