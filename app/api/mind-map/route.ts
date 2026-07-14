@@ -31,6 +31,7 @@ export async function GET() {
     threads: threads.map((thread) => ({
       id: thread.id,
       name: thread.name,
+      kind: thread.kind,
       description: thread.description,
       noteCount: thread.noteCount,
       notes: thread.notes.map((note) => ({
