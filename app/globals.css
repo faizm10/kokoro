@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
   --background: #f5f4ed;
   --foreground: #141413;
@@ -36,6 +38,15 @@
   --color-error: var(--error);
   --font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
   --font-hand: var(--font-hand);
+  --animate-blink-cursor: blink-cursor 1.2s step-end infinite;
+  @keyframes blink-cursor {
+  0%, 49% {
+    opacity: 1;
+    }
+  50%, 100% {
+    opacity: 0;
+    }
+  }
 }
 
 * {
@@ -49,7 +60,7 @@ html {
 body {
   min-height: 100vh;
   background:
-    linear-gradient(rgba(245, 244, 237, 0.6), rgba(245, 244, 237, 0.72)),
+    linear-gradient(rgba(245, 244, 237, 0.18), rgba(245, 244, 237, 0.28)),
     url("/landscape.jpeg") center / cover fixed;
   color: var(--foreground);
   font-family: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
