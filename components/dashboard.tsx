@@ -1,11 +1,12 @@
 "use client";
 
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Archive, BookOpen, Check, Feather, LogOut, Network, Settings, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 
+import { DashboardCommandPalette, useDashboardCommandPalette } from "@/components/dashboard-command";
 import { MindMap, type MindMapData } from "@/components/mind-map";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -121,7 +122,21 @@ export function Dashboard() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [noteError, setNoteError] = useState("");
+  const quickNoteRef = useRef<HTMLTextAreaElement | null>(null);
+  const { open: commandOpen, setOpen: setCommandOpen } = useDashboardCommandPalette();
   const today = formatDashboardDate(new Date());
+
+  function focusQuickNote() {
+    quickNoteRef.current?.focus();
+    goToSection("#today");
+  }
+
+  function goToSection(hash: string) {
+    const target = document.querySelector(hash);
+    if (target instanceof HTMLElement) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
 
   useEffect(() => {
     let ignore = false;
@@ -229,7 +244,17 @@ export function Dashboard() {
             people
           </Link>
         </nav>
-        <div className="mt-auto border-t border-border pt-5">
+        <div className="mt-auto space-y-4 border-t border-border pt-5">
+          <button
+            type="button"
+            onClick={() => setCommandOpen(true)}
+            className="flex w-full items-center justify-between rounded-[8px] border border-border bg-background/50 px-3 py-2.5 text-left text-sm text-stone transition-colors hover:bg-secondary/60 hover:text-foreground"
+          >
+            <span>commands</span>
+            <kbd className="rounded border border-border bg-card px-1.5 py-0.5 text-[10px] tracking-[0.08em] text-stone">
+              ⌘K
+            </kbd>
+          </button>
           <p className="text-xs text-stone">your words stay yours.</p>
         </div>
       </aside>
@@ -237,6 +262,14 @@ export function Dashboard() {
       <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/95 px-5 lg:hidden">
         <p className="font-hand text-xl text-olive">kokoro</p>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCommandOpen(true)}
+            aria-label="Open command menu"
+            className="rounded-md border border-border px-2 py-1 text-[10px] tracking-[0.08em] text-stone"
+          >
+            ⌘K
+          </button>
           <nav aria-label="Mobile primary" className="flex items-center gap-1">
             {navItems.slice(0, 4).map(({ label, icon: Icon }, index) => (
               <a
@@ -256,43 +289,71 @@ export function Dashboard() {
         </div>
       </header>
 
+      <DashboardCommandPalette
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        recentNotes={recentNotes}
+        canSaveNote={Boolean(quickNote.trim()) && !saving}
+        onFocusQuickNote={focusQuickNote}
+        onSaveNote={() => void saveQuickNote()}
+      />
+
       <main id="today" className="mx-auto max-w-[1240px] px-5 py-10 sm:px-8 sm:py-14 lg:ml-[216px] lg:px-12 xl:px-16">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-wrap items-end justify-between gap-4"
         >
-          <p className="text-xs tracking-[0.08em] text-stone">{today.weekday}</p>
-          <h1 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal tracking-[-0.045em]">{today.greeting}</h1>
-          <p className="mt-3 font-hand text-lg text-olive">what is still with you?</p>
+          <div>
+            <p className="text-xs tracking-[0.08em] text-stone">{today.weekday}</p>
+            <h1 className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-normal tracking-[-0.045em]">{today.greeting}</h1>
+            <p className="mt-3 font-hand text-lg text-olive">what is still with you?</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCommandOpen(true)}
+            className="hidden items-center gap-2 rounded-[8px] border border-border bg-card/80 px-3 py-2 text-xs text-stone transition-colors hover:bg-secondary hover:text-foreground lg:inline-flex"
+          >
+            search commands
+            <kbd className="rounded border border-border px-1.5 py-0.5 text-[10px] tracking-[0.08em]">⌘K</kbd>
+          </button>
         </motion.div>
 
         <div className="mt-10 grid items-start gap-5 xl:grid-cols-[1.3fr_0.8fr]">
           <div className="grid gap-5">
-            <Card className="p-6 sm:p-7">
+            <Card className="border-[#e4e1d7] bg-[#faf9f5]/95 p-6 shadow-[0_10px_40px_rgba(20,20,19,0.06)] sm:p-7">
               <CardHeader>
-                <CardTitle>quick note</CardTitle>
+                <CardTitle className="text-[15px]">quick note</CardTitle>
                 <span className="font-hand text-sm text-stone">uncategorized is fine</span>
               </CardHeader>
               <Textarea
+                ref={quickNoteRef}
                 value={quickNote}
                 onChange={(event) => setQuickNote(event.target.value)}
                 onKeyDown={handleQuickNoteKeyDown}
                 placeholder="drop a thought..."
                 aria-label="Quick note"
-                className="mt-6 min-h-24"
+                className="mt-5 min-h-[112px] leading-7"
               />
-              <div className="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+              <div className="mt-5 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
                 {noteError ? <span className="mr-auto text-xs text-error">{noteError}</span> : null}
-                {saved ? <span className="flex items-center gap-1.5 text-xs text-stone"><Check className="size-3.5" /> saved</span> : null}
-                <span className="text-[11px] text-stone/70">cmd enter</span>
+                {saved ? (
+                  <span className="mr-auto flex items-center gap-1.5 text-xs text-stone">
+                    <Check className="size-3.5" /> saved
+                  </span>
+                ) : null}
+                <kbd className="rounded-[6px] border border-border bg-secondary/70 px-2 py-1 text-[10px] tracking-[0.06em] text-stone">
+                  ⌘ enter
+                </kbd>
                 <Button
                   type="button"
                   onClick={() => void saveQuickNote()}
                   disabled={!quickNote.trim() || saving}
                   aria-keyshortcuts="Meta+Enter Control+Enter"
+                  className="disabled:bg-primary/35 disabled:text-primary-foreground/90 disabled:opacity-100"
                 >
-                  {saving ? "saving" : "save note"}
+                  {saving ? "saving…" : "save note"}
                 </Button>
               </div>
             </Card>
