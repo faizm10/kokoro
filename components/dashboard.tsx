@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Archive, BookOpen, Check, Feather, Network, Settings, Sparkles } from "lucide-react";
+import { Archive, BookOpen, Check, Feather, LogOut, Network, Settings, Sparkles, Users } from "lucide-react";
+import Link from "next/link";
+import { signOut } from "next-auth/react";
 
-import { MindMap } from "@/components/mind-map";
+import { MindMap, type MindMapData } from "@/components/mind-map";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +20,19 @@ const navItems = [
   { label: "settings", icon: Settings },
 ];
 
+type RecentNote = {
+  id: string;
+  body: string;
+  kind: "quick" | "reflection";
+  createdAt: string;
+};
+
+type Account = {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+};
+
 function formatDashboardDate(date: Date) {
   return {
     weekday: date
@@ -29,23 +44,170 @@ function formatDashboardDate(date: Date) {
   };
 }
 
-export function Dashboard() {
-  const [quickNote, setQuickNote] = useState("");
-  const [saved, setSaved] = useState(false);
-  const today = formatDashboardDate(new Date());
+function formatRecentNoteTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
 
-  function saveQuickNote() {
-    if (!quickNote.trim()) return;
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1800);
-    setQuickNote("");
+function AccountAvatar({ account, size = "default" }: { account: Account | null; size?: "default" | "sm" }) {
+  const dimensions = size === "sm" ? "size-8" : "size-9";
+
+  if (account?.image) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={account.image}
+        alt={account.name ?? account.email ?? "Signed in account"}
+        className={cn(dimensions, "rounded-full border border-border object-cover")}
+      />
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      aria-label={account ? `Signed in as ${account.name ?? account.email}` : "Account"}
+      className={cn(
+        dimensions,
+        "flex items-center justify-center rounded-full border border-border bg-background text-xs text-stone",
+      )}
+    >
+      {(account?.name ?? account?.email ?? "?").slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
+function SidebarAccountBar({ account }: { account: Account | null }) {
+  return (
+    <div className="rounded-[8px] border border-border bg-background/45 p-3">
+      <p className="mb-3 text-[11px] tracking-[0.08em] text-stone/70">ACCOUNT</p>
+      {account ? (
+        <div className="flex items-center gap-3">
+          <AccountAvatar account={account} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-foreground">{account.name ?? account.email}</p>
+            {account.email ? <p className="truncate text-[11px] text-stone">{account.email}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => void signOut({ callbackUrl: "/" })}
+            aria-label="Sign out"
+            className="rounded-md p-2 text-stone transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <LogOut className="size-4" strokeWidth={1.5} />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <AccountAvatar account={null} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-foreground">not signed in</p>
+            <p className="truncate text-[11px] text-stone">your words stay yours.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Dashboard() {
+  const [quickNote, setQuickNote] = useState("");
+  const [recentNotes, setRecentNotes] = useState<RecentNote[]>([]);
+  const [mindMap, setMindMap] = useState<MindMapData | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [noteError, setNoteError] = useState("");
+  const today = formatDashboardDate(new Date());
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadDashboardState() {
+      const [notesResponse, mindMapResponse, sessionResponse] = await Promise.all([
+        fetch("/api/notes"),
+        fetch("/api/mind-map"),
+        fetch("/api/auth/session"),
+      ]);
+
+      if (notesResponse.ok) {
+        const data = (await notesResponse.json()) as { notes?: RecentNote[] };
+        if (!ignore) setRecentNotes(data.notes ?? []);
+      }
+
+      if (mindMapResponse.ok) {
+        const data = (await mindMapResponse.json()) as MindMapData;
+        if (!ignore) setMindMap(data);
+      }
+
+      if (sessionResponse.ok) {
+        const data = (await sessionResponse.json()) as { user?: Account };
+        if (!ignore) setAccount(data.user?.email ? data.user : null);
+      }
+    }
+
+    void loadDashboardState();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  async function saveQuickNote() {
+    const body = quickNote.trim();
+
+    if (!body || saving) return;
+
+    setSaving(true);
+    setNoteError("");
+
+    try {
+      const response = await fetch("/api/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ body }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Note could not be saved.");
+      }
+
+      const data = (await response.json()) as { notes?: RecentNote[] };
+      setRecentNotes(data.notes ?? []);
+      const mindMapResponse = await fetch("/api/mind-map");
+      if (mindMapResponse.ok) {
+        setMindMap((await mindMapResponse.json()) as MindMapData);
+      }
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+      setQuickNote("");
+    } catch {
+      setNoteError("note could not be saved. try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleQuickNoteKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void saveQuickNote();
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[rgba(245,244,237,0.82)]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[216px] border-r border-border bg-[#f1f0e9] px-6 py-8 lg:flex lg:flex-col">
         <p className="font-hand text-xl text-olive">kokoro</p>
-        <nav aria-label="Primary" className="mt-16 space-y-1">
+        <div className="mt-8">
+          <SidebarAccountBar account={account} />
+        </div>
+        <nav aria-label="Primary" className="mt-8 space-y-1">
           {navItems.map(({ label, icon: Icon }, index) => (
             <a
               key={label}
@@ -59,6 +221,13 @@ export function Dashboard() {
               {label}
             </a>
           ))}
+          <Link
+            href="/people"
+            className="flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-sm text-stone transition-colors hover:bg-secondary/60 hover:text-foreground"
+          >
+            <Users className="size-4" strokeWidth={1.5} />
+            people
+          </Link>
         </nav>
         <div className="mt-auto border-t border-border pt-5">
           <p className="text-xs text-stone">your words stay yours.</p>
@@ -67,18 +236,24 @@ export function Dashboard() {
 
       <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/95 px-5 lg:hidden">
         <p className="font-hand text-xl text-olive">kokoro</p>
-        <nav aria-label="Mobile primary" className="flex items-center gap-1">
-          {navItems.slice(0, 4).map(({ label, icon: Icon }, index) => (
-            <a
-              key={label}
-              href={label === "today" ? "#today" : `#${label}`}
-              aria-label={label}
-              className={cn("rounded-md p-2 text-stone", index === 0 && "bg-secondary text-foreground")}
-            >
-              <Icon className="size-4" strokeWidth={1.5} />
-            </a>
-          ))}
-        </nav>
+        <div className="flex items-center gap-2">
+          <nav aria-label="Mobile primary" className="flex items-center gap-1">
+            {navItems.slice(0, 4).map(({ label, icon: Icon }, index) => (
+              <a
+                key={label}
+                href={label === "today" ? "#today" : `#${label}`}
+                aria-label={label}
+                className={cn("rounded-md p-2 text-stone", index === 0 && "bg-secondary text-foreground")}
+              >
+                <Icon className="size-4" strokeWidth={1.5} />
+              </a>
+            ))}
+            <Link href="/people" aria-label="people" className="rounded-md p-2 text-stone">
+              <Users className="size-4" strokeWidth={1.5} />
+            </Link>
+          </nav>
+          {account ? <AccountAvatar account={account} size="sm" /> : null}
+        </div>
       </header>
 
       <main id="today" className="mx-auto max-w-[1240px] px-5 py-10 sm:px-8 sm:py-14 lg:ml-[216px] lg:px-12 xl:px-16">
@@ -102,14 +277,22 @@ export function Dashboard() {
               <Textarea
                 value={quickNote}
                 onChange={(event) => setQuickNote(event.target.value)}
+                onKeyDown={handleQuickNoteKeyDown}
                 placeholder="drop a thought..."
                 aria-label="Quick note"
                 className="mt-6 min-h-24"
               />
-              <div className="mt-4 flex items-center justify-end gap-3 border-t border-border pt-4">
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+                {noteError ? <span className="mr-auto text-xs text-error">{noteError}</span> : null}
                 {saved ? <span className="flex items-center gap-1.5 text-xs text-stone"><Check className="size-3.5" /> saved</span> : null}
-                <Button type="button" onClick={saveQuickNote} disabled={!quickNote.trim()}>
-                  save note
+                <span className="text-[11px] text-stone/70">cmd enter</span>
+                <Button
+                  type="button"
+                  onClick={() => void saveQuickNote()}
+                  disabled={!quickNote.trim() || saving}
+                  aria-keyshortcuts="Meta+Enter Control+Enter"
+                >
+                  {saving ? "saving" : "save note"}
                 </Button>
               </div>
             </Card>
@@ -135,7 +318,7 @@ export function Dashboard() {
                 <CardTitle>mind map</CardTitle>
                 <a href="#threads" className="text-xs text-primary hover:underline">open map</a>
               </CardHeader>
-              <MindMap />
+              <MindMap data={mindMap} />
             </Card>
           </div>
 
@@ -145,9 +328,28 @@ export function Dashboard() {
                 <CardTitle>thought threads</CardTitle>
                 <Network className="size-4 text-stone" strokeWidth={1.5} />
               </CardHeader>
-              <p className="mt-8 text-sm leading-6 text-stone">
-                threads will gather here as your notes start to connect.
-              </p>
+              {mindMap?.threads.length ? (
+                <ul className="mt-6 space-y-3">
+                  {mindMap.threads.slice(0, 5).map((thread) => (
+                    <li key={thread.id} className="flex items-center justify-between gap-4 border-t border-border pt-3 first:border-t-0 first:pt-0">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-[0.06em] text-stone">
+                            {thread.kind}
+                          </span>
+                          <p className="truncate text-sm text-foreground">{thread.name}</p>
+                        </div>
+                        <p className="mt-1 text-[11px] text-stone">{thread.noteCount} connected notes</p>
+                      </div>
+                      <span className="size-2 rounded-full bg-primary" />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-8 text-sm leading-6 text-stone">
+                  threads will gather here as your notes start to connect.
+                </p>
+              )}
             </Card>
 
             <Card className="p-6">
@@ -166,9 +368,25 @@ export function Dashboard() {
                 <CardTitle>recent notes</CardTitle>
                 <a href="#archive" className="text-xs text-primary hover:underline">all notes</a>
               </CardHeader>
-              <p className="mt-8 text-sm leading-6 text-stone">
-                your recent notes will appear here.
-              </p>
+              {recentNotes.length > 0 ? (
+                <ul className="mt-6 space-y-4">
+                  {recentNotes.map((note) => (
+                    <li key={note.id} className="border-t border-border pt-3 first:border-t-0 first:pt-0">
+                      <Link
+                        href={`/notes/${note.id}`}
+                        className="-mx-2 block rounded-[8px] px-2 py-1.5 transition-colors hover:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <p className="line-clamp-3 text-sm leading-6 text-foreground">{note.body}</p>
+                        <p className="mt-2 text-[11px] text-stone/70">{formatRecentNoteTime(note.createdAt)}</p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-8 text-sm leading-6 text-stone">
+                  your recent notes will appear here.
+                </p>
+              )}
             </Card>
           </div>
         </div>

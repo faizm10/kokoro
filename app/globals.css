@@ -48,7 +48,9 @@ html {
 
 body {
   min-height: 100vh;
-  background: var(--background);
+  background:
+    linear-gradient(rgba(245, 244, 237, 0.74), rgba(245, 244, 237, 0.86)),
+    url("/landscape.jpeg") center / cover fixed;
   color: var(--foreground);
   font-family: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
   text-rendering: optimizeLegibility;
