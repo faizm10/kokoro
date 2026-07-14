@@ -1,5 +1,7 @@
 # Kokoro
 
+![Kokoro landing page](public/hero.png)
+
 A quiet, AI-native journal interface built with Next.js, TypeScript, Tailwind CSS, Auth.js, shadcn-style primitives, and Framer Motion.
 
 ## Run locally
