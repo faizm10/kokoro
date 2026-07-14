@@ -201,7 +201,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[rgba(245,244,237,0.82)]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[216px] border-r border-border bg-[#f1f0e9] px-6 py-8 lg:flex lg:flex-col">
         <p className="font-hand text-xl text-olive">kokoro</p>
         <div className="mt-8">
@@ -333,7 +333,12 @@ export function Dashboard() {
                   {mindMap.threads.slice(0, 5).map((thread) => (
                     <li key={thread.id} className="flex items-center justify-between gap-4 border-t border-border pt-3 first:border-t-0 first:pt-0">
                       <div className="min-w-0">
-                        <p className="truncate text-sm text-foreground">{thread.name}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-[0.06em] text-stone">
+                            {thread.kind}
+                          </span>
+                          <p className="truncate text-sm text-foreground">{thread.name}</p>
+                        </div>
                         <p className="mt-1 text-[11px] text-stone">{thread.noteCount} connected notes</p>
                       </div>
                       <span className="size-2 rounded-full bg-primary" />
