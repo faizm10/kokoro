@@ -36,6 +36,47 @@ const threadKeywordGroups = [
   },
 ];
 
+const eventKeywordGroups = [
+  {
+    name: "meeting",
+    keywords: ["meeting", "sync", "standup", "review"],
+  },
+  {
+    name: "conversation",
+    keywords: ["conversation", "talk", "talked", "chat", "call", "called", "text", "texted"],
+  },
+  {
+    name: "school",
+    keywords: ["class", "exam", "assignment", "lecture", "school", "study"],
+  },
+  {
+    name: "work event",
+    keywords: ["deadline", "interview", "presentation", "launch", "demo"],
+  },
+  {
+    name: "social plan",
+    keywords: ["dinner", "lunch", "coffee", "party", "date", "hangout"],
+  },
+  {
+    name: "trip",
+    keywords: ["trip", "flight", "airport", "travel", "drive", "visit"],
+  },
+];
+
+const relationshipWords = new Set([
+  "mom",
+  "mother",
+  "dad",
+  "father",
+  "brother",
+  "sister",
+  "friend",
+  "partner",
+  "roommate",
+  "manager",
+  "boss",
+]);
+
 const stopWords = new Set([
   "about",
   "after",
@@ -77,6 +118,39 @@ const stopWords = new Set([
   "would",
   "your",
 ]);
+
+function titleCase(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function threadName(kind: "theme" | "who" | "event", label: string) {
+  return kind === "theme" ? label : `${kind}: ${label}`;
+}
+
+function parseThreadName(name: string) {
+  if (name.startsWith("who: ")) {
+    return {
+      kind: "who" as const,
+      label: name.replace("who: ", ""),
+    };
+  }
+
+  if (name.startsWith("event: ")) {
+    return {
+      kind: "event" as const,
+      label: name.replace("event: ", ""),
+    };
+  }
+
+  return {
+    kind: "theme" as const,
+    label: name,
+  };
+}
 
 export async function ensureUser(profile: { email: string; name?: string | null; image?: string | null }) {
   const existing = await db.query.users.findFirst({
@@ -122,7 +196,11 @@ function extractThreadNames(body: string) {
   const words: string[] = normalized.match(/[a-z][a-z'-]{2,}/g) ?? [];
   const matchedGroups = threadKeywordGroups
     .filter((group) => group.keywords.some((keyword) => words.includes(keyword)))
-    .map((group) => group.name);
+    .map((group) => threadName("theme", group.name));
+  const matchedEvents = eventKeywordGroups
+    .filter((group) => group.keywords.some((keyword) => words.includes(keyword)))
+    .map((group) => threadName("event", group.name));
+  const matchedPeople = extractPeopleThreads(body, words);
   const wordCounts = new Map<string, number>();
 
   for (const word of words) {
@@ -133,11 +211,36 @@ function extractThreadNames(body: string) {
 
   const fallbackWords = [...wordCounts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([word]) => word)
+    .map(([word]) => threadName("theme", word))
     .slice(0, 2);
 
-  const threadNames = [...new Set([...matchedGroups, ...fallbackWords])].slice(0, 3);
+  const threadNames = [...new Set([...matchedPeople, ...matchedEvents, ...matchedGroups, ...fallbackWords])].slice(0, 4);
   return threadNames.length > 0 ? threadNames : ["loose thoughts"];
+}
+
+function extractPeopleThreads(body: string, words: string[]) {
+  const people = new Set<string>();
+  const capitalizedPersonPattern =
+    /\b(?:with|about|for|from|to|called|texted|met|saw|missed|seeing|helped|thanked)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g;
+  const lowerPersonPattern =
+    /\b(?:with|about|for|from|to|called|texted|met|saw|missed|seeing|helped|thanked)\s+([a-z][a-z]+(?:\s+[a-z][a-z]+)?)/g;
+  const ignoredNames = new Set(["today", "tomorrow", "yesterday", "morning", "night", "work", "school"]);
+
+  for (const match of body.matchAll(capitalizedPersonPattern)) {
+    const name = match[1]?.trim();
+    if (name && !ignoredNames.has(name.toLowerCase())) people.add(titleCase(name));
+  }
+
+  for (const match of body.toLowerCase().matchAll(lowerPersonPattern)) {
+    const name = match[1]?.trim();
+    if (name && !ignoredNames.has(name)) people.add(titleCase(name));
+  }
+
+  for (const word of words) {
+    if (relationshipWords.has(word)) people.add(titleCase(word));
+  }
+
+  return [...people].slice(0, 2).map((person) => threadName("who", person));
 }
 
 async function findOrCreateThread(userId: string, name: string) {
@@ -226,9 +329,7 @@ export async function getMindMap(userId: string) {
   });
 
   for (const note of recentNotes) {
-    if (note.threadLinks.length === 0) {
-      await connectNoteToThreads(note);
-    }
+    await connectNoteToThreads(note);
   }
 
   const threadRows = await db.query.threads.findMany({
@@ -246,7 +347,8 @@ export async function getMindMap(userId: string) {
   return threadRows
     .map((thread) => ({
       id: thread.id,
-      name: thread.name,
+      name: parseThreadName(thread.name).label,
+      kind: parseThreadName(thread.name).kind,
       description: thread.description,
       noteCount: thread.noteLinks.length,
       notes: thread.noteLinks
