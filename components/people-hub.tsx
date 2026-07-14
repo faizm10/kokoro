@@ -6,15 +6,13 @@ import { ArrowLeft, Plus, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PersonSummaryDTO } from "@/lib/serialize";
+import { cn } from "@/lib/utils";
 
 type Account = { name?: string | null; email?: string | null; image?: string | null };
-
-const fieldClass =
-  "w-full rounded-[10px] border border-border bg-background/60 px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-stone/60 focus:border-ring focus:ring-2 focus:ring-ring/30";
-const labelClass = "mb-1.5 block text-[11px] tracking-[0.08em] text-stone/80";
 
 function initials(name: string) {
   return name
@@ -33,6 +31,9 @@ function relativeTime(iso: string | null) {
   const months = Math.floor(days / 30);
   return months === 1 ? "1 month ago" : `${months} months ago`;
 }
+
+const lineInput =
+  "w-full border-0 border-b border-[#d8d5cb] bg-transparent px-0 py-2 text-[15px] text-foreground outline-none placeholder:text-stone/45 focus:border-primary focus:ring-0";
 
 export function PeopleHub({
   initialPeople,
@@ -74,8 +75,8 @@ export function PeopleHub({
   }
 
   return (
-    <main className="min-h-screen bg-background px-5 py-10 sm:px-8 sm:py-14">
-      <div className="mx-auto max-w-[960px]">
+    <main className="min-h-screen bg-[rgba(245,244,237,0.72)] px-5 py-10 sm:px-8 sm:py-14">
+      <div className="mx-auto max-w-[720px]">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-2 rounded-[8px] px-2 py-2 text-sm text-stone transition-colors hover:bg-secondary hover:text-foreground"
@@ -88,145 +89,160 @@ export function PeopleHub({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-6"
+          className="mt-8"
         >
-          <p className="text-xs tracking-[0.08em] text-stone">INTERACTION NOTES</p>
-          <h1 className="mt-3 text-[clamp(1.9rem,4vw,3rem)] font-normal tracking-[-0.045em]">
-            people you keep in mind
+          <p className="font-hand text-[17px] text-olive">people</p>
+          <h1 className="mt-2 text-[clamp(1.9rem,4vw,2.75rem)] font-normal tracking-[-0.045em]">
+            who are you keeping notes on?
           </h1>
-          <p className="mt-3 max-w-[54ch] font-hand text-lg text-olive">
-            a quiet place to remember what people actually told you.
+          <p className="mt-3 max-w-[48ch] text-[15px] leading-7 text-stone">
+            think of this as a quiet address book. open a name, write what they told you.
           </p>
         </motion.div>
 
-        <div className="mt-6 flex items-start gap-2.5 rounded-[10px] border border-border bg-secondary/40 px-4 py-3 text-[13px] leading-6 text-stone">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-olive" strokeWidth={1.5} />
-          <p>
-            only what you record from your own direct interactions lives here. nothing is inferred,
-            tracked, or gathered on its own — and the assistant only ever reads these notes.
-          </p>
-        </div>
+        <p className="mt-6 flex items-start gap-2 text-[13px] leading-6 text-stone/80">
+          <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-olive" strokeWidth={1.5} />
+          <span>only what you write from your own conversations lives here — nothing is guessed for you.</span>
+        </p>
 
-        <div className="mt-8 flex items-center justify-between">
+        <div className="mt-10 flex items-end justify-between gap-4 border-b border-[#d8d5cb] pb-3">
           <p className="text-sm text-stone">
-            {people.length} {people.length === 1 ? "person" : "people"}
+            {people.length === 0
+              ? "the page is blank"
+              : `${people.length} ${people.length === 1 ? "person" : "people"}`}
           </p>
-          <Button type="button" variant="secondary" onClick={() => setAdding((v) => !v)}>
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            className="inline-flex items-center gap-1.5 text-sm text-primary transition-colors hover:text-[#152d50]"
+          >
             <Plus className="size-4" strokeWidth={1.5} />
-            add person
-          </Button>
+            {adding ? "close" : "add someone"}
+          </button>
         </div>
 
         {adding ? (
-          <Card className="mt-4 p-6">
-            <CardHeader>
-              <CardTitle>add a person</CardTitle>
-              <span className="font-hand text-sm text-stone">just a name is enough</span>
-            </CardHeader>
-            <form onSubmit={handleCreate} className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-1">
-                <label className={labelClass} htmlFor="person-name">
-                  NAME
-                </label>
+          <motion.form
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            onSubmit={handleCreate}
+            className={cn(
+              "relative mt-6 overflow-hidden rounded-[4px] border border-[#e2dfd4] bg-[#faf9f5] px-6 py-7 shadow-[0_18px_50px_rgba(20,20,19,0.06)] sm:px-8",
+              "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-[#d9c7b6]",
+            )}
+          >
+            <p className="font-hand text-[15px] text-olive">new page</p>
+            <p className="mt-1 text-[12px] text-stone/70">start with a name. the rest can wait.</p>
+
+            <div className="mt-7 space-y-6">
+              <label className="block">
+                <span className="mb-1 block font-hand text-[14px] text-stone">their name</span>
                 <input
-                  id="person-name"
-                  className={fieldClass}
+                  className={cn(lineInput, "text-[1.35rem] tracking-[-0.02em]")}
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Priya Sharma"
+                  placeholder="Priya Sharma"
                   autoFocus
                 />
-              </div>
-              <div className="sm:col-span-1">
-                <label className={labelClass} htmlFor="person-rel">
-                  RELATIONSHIP
-                </label>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block font-hand text-[14px] text-stone">how you know them</span>
                 <input
-                  id="person-rel"
-                  className={fieldClass}
+                  className={lineInput}
                   value={form.relationship}
                   onChange={(e) => setForm((f) => ({ ...f, relationship: e.target.value }))}
-                  placeholder="e.g. colleague, friend"
+                  placeholder="friend, classmate, coworker…"
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelClass} htmlFor="person-tags">
-                  TAGS (COMMA SEPARATED)
-                </label>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block font-hand text-[14px] text-stone">loose tags, if you want</span>
                 <input
-                  id="person-tags"
-                  className={fieldClass}
+                  className={lineInput}
                   value={form.tags}
                   onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                  placeholder="e.g. work, book club"
+                  placeholder="book club, work — comma-separated"
                 />
-              </div>
-              <div className="flex items-center gap-3 sm:col-span-2">
-                <Button type="submit" disabled={!form.name.trim() || saving}>
-                  {saving ? "adding" : "add person"}
+              </label>
+            </div>
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button type="submit" disabled={!form.name.trim() || saving}>
+                {saving ? "opening page…" : "start their page"}
+              </Button>
+              {people.length > 0 ? (
+                <Button type="button" variant="ghost" onClick={() => setAdding(false)}>
+                  not now
                 </Button>
-                {error ? <span className="text-xs text-error">{error}</span> : null}
-              </div>
-            </form>
-          </Card>
+              ) : null}
+              {error ? <span className="text-xs text-error">{error}</span> : null}
+            </div>
+          </motion.form>
         ) : null}
 
         {people.length > 0 ? (
-          <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-            {people.map((person) => (
-              <li key={person.id}>
+          <ul className="mt-2 divide-y divide-[#e4e1d7]">
+            {people.map((person, index) => (
+              <motion.li
+                key={person.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03, duration: 0.35 }}
+              >
                 <Link
                   href={`/people/${person.id}`}
-                  className="block h-full rounded-[14px] border border-border bg-card p-5 transition-colors hover:border-ring/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group flex items-start gap-4 py-5 transition-colors hover:bg-[#faf9f5]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-11 items-center justify-center rounded-full border border-border bg-secondary/60 text-sm text-olive">
+                  <Avatar className="mt-0.5 size-10 border border-[#e4e1d7]">
+                    <AvatarFallback className="bg-[#f1efe6] text-sm text-olive">
                       {initials(person.name) || "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="truncate text-[16px] tracking-[-0.01em] text-foreground group-hover:text-primary">
+                        {person.name}
+                      </p>
+                      <p className="shrink-0 text-[11px] text-stone/70">
+                        {relativeTime(person.lastInteractionAt)}
+                      </p>
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[15px] text-foreground">{person.name}</p>
-                      {person.relationship ? (
-                        <p className="truncate text-xs text-stone">{person.relationship}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  {person.tags.length > 0 ? (
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {person.tags.slice(0, 4).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] text-secondary-foreground"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-[11px] text-stone/80">
-                    <span>
-                      {person.interactionCount}{" "}
-                      {person.interactionCount === 1 ? "note" : "notes"} · {relativeTime(person.lastInteractionAt)}
-                    </span>
-                    {person.openFollowUps > 0 ? (
-                      <span className="text-primary">{person.openFollowUps} open</span>
+                    <p className="mt-1 text-[13px] text-stone">
+                      {person.relationship ? `${person.relationship} · ` : null}
+                      {person.interactionCount} {person.interactionCount === 1 ? "note" : "notes"}
+                      {person.openFollowUps > 0 ? ` · ${person.openFollowUps} open` : null}
+                    </p>
+                    {person.tags.length > 0 ? (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {person.tags.slice(0, 4).map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="rounded-full border-0 bg-[#efece3] px-2 py-0 text-[11px] font-normal text-olive"
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
                 </Link>
-              </li>
+              </motion.li>
             ))}
           </ul>
         ) : !adding ? (
-          <Card className="mt-6 flex flex-col items-center gap-3 p-12 text-center">
-            <Users className="size-6 text-stone" strokeWidth={1.5} />
-            <p className="font-hand text-lg text-olive">no one here yet.</p>
-            <p className="max-w-[40ch] text-sm text-stone">
-              add someone you know, then jot down what you learn as you talk.
+          <div className="mt-10 border border-dashed border-[#d8d5cb] px-6 py-14 text-center">
+            <Users className="mx-auto size-5 text-stone" strokeWidth={1.5} />
+            <p className="mt-4 font-hand text-lg text-olive">the notebook is empty.</p>
+            <p className="mx-auto mt-2 max-w-[36ch] text-sm leading-6 text-stone">
+              add someone you know, then jot what you learn as you talk.
             </p>
-          </Card>
+          </div>
         ) : null}
 
-        <p className="mt-10 text-center text-[11px] text-stone/70">
-          signed in as {account.name ?? account.email} · your notes stay yours.
+        <p className="mt-12 text-center font-hand text-[13px] text-stone/65">
+          signed in as {account.name ?? account.email}
         </p>
       </div>
     </main>
