@@ -7,6 +7,7 @@ type MindMapNote = {
 type MindMapThread = {
   id: string;
   name: string;
+  kind: "theme" | "who" | "event";
   description: string | null;
   noteCount: number;
   notes: MindMapNote[];
@@ -28,6 +29,30 @@ type PositionedThread = MindMapThread & {
 
 function truncateLabel(value: string, length = 18) {
   return value.length > length ? `${value.slice(0, length - 1)}...` : value;
+}
+
+function getThreadStyle(kind: MindMapThread["kind"]) {
+  if (kind === "who") {
+    return {
+      fill: "#504e49",
+      stroke: "#faf9f5",
+      label: "who",
+    };
+  }
+
+  if (kind === "event") {
+    return {
+      fill: "#7a6a48",
+      stroke: "#faf9f5",
+      label: "event",
+    };
+  }
+
+  return {
+    fill: "#1b365d",
+    stroke: "#faf9f5",
+    label: "theme",
+  };
 }
 
 function getThreadPositions(threads: MindMapThread[]) {
@@ -122,29 +147,42 @@ export function MindMap({ data }: { data?: MindMapData | null }) {
         <g filter="url(#mind-map-shadow)">
           <circle cx="360" cy="170" r="42" fill="#faf9f5" stroke="#1b365d" strokeWidth="1.5" />
           <text x="360" y="165" textAnchor="middle" className="fill-foreground text-[15px] font-medium">
-            {data?.center.label ?? "you"}
+            life
           </text>
           <text x="360" y="184" textAnchor="middle" className="fill-stone text-[10px]">
             {threads.length} threads
           </text>
         </g>
 
-        {positionedThreads.map((thread) => (
-          <g key={thread.id} filter="url(#mind-map-shadow)">
-            <circle cx={thread.x} cy={thread.y} r={thread.radius} fill="#1b365d" />
-            <text
-              x={thread.x}
-              y={thread.y - 3}
-              textAnchor="middle"
-              className="fill-primary-foreground text-[12px] font-medium"
-            >
-              {truncateLabel(thread.name, 14)}
-            </text>
-            <text x={thread.x} y={thread.y + 15} textAnchor="middle" className="fill-primary-foreground/80 text-[10px]">
-              {thread.noteCount} {thread.noteCount === 1 ? "note" : "notes"}
-            </text>
-          </g>
-        ))}
+        {positionedThreads.map((thread) => {
+          const style = getThreadStyle(thread.kind);
+
+          return (
+            <g key={thread.id} filter="url(#mind-map-shadow)">
+              <circle cx={thread.x} cy={thread.y} r={thread.radius} fill={style.fill} />
+              <circle cx={thread.x} cy={thread.y - thread.radius + 11} r="10" fill={style.stroke} opacity="0.94" />
+              <text
+                x={thread.x}
+                y={thread.y - thread.radius + 15}
+                textAnchor="middle"
+                className="fill-stone text-[8px] font-medium uppercase"
+              >
+                {style.label}
+              </text>
+              <text
+                x={thread.x}
+                y={thread.y - 3}
+                textAnchor="middle"
+                className="fill-primary-foreground text-[12px] font-medium"
+              >
+                {truncateLabel(thread.name, 14)}
+              </text>
+              <text x={thread.x} y={thread.y + 15} textAnchor="middle" className="fill-primary-foreground/80 text-[10px]">
+                {thread.noteCount} {thread.noteCount === 1 ? "note" : "notes"}
+              </text>
+            </g>
+          );
+        })}
 
         {positionedThreads.map((thread) =>
           thread.notes.map((note, noteIndex) => {
@@ -169,7 +207,7 @@ export function MindMap({ data }: { data?: MindMapData | null }) {
 
       <div className="border-t border-[#e4e1d7] px-5 py-4">
         <p className="text-xs leading-5 text-stone">
-          each large node is a thread Kokoro noticed. small dots are notes; click one to open it.
+          large nodes are who, event, and theme threads. small dots are notes; click one to open it.
         </p>
       </div>
     </div>
