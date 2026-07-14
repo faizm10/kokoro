@@ -18,6 +18,7 @@
   --accent: #e8e6dc;
   --accent-foreground: #141413;
   --border: #dedcd2;
+  --input: #dedcd2;
   --ring: #2d5a8a;
   --stone: #6b6a64;
   --olive: #504e49;
@@ -40,6 +41,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
+  --color-input: var(--input);
   --color-ring: var(--ring);
   --color-stone: var(--stone);
   --color-olive: var(--olive);
