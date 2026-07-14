@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 
 import { DashboardCommandPalette, useDashboardCommandPalette } from "@/components/dashboard-command";
 import { MindMap, type MindMapData } from "@/components/mind-map";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +27,14 @@ type RecentNote = {
   body: string;
   kind: "quick" | "reflection";
   createdAt: string;
+};
+
+type RecentPerson = {
+  id: string;
+  name: string;
+  relationship: string | null;
+  lastInteractionAt: string | null;
+  interactionCount: number;
 };
 
 type Account = {
@@ -52,6 +61,34 @@ function formatRecentNoteTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function personInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("");
+}
+
+function relativePersonTime(iso: string | null) {
+  if (!iso) return "no notes yet";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? "1mo ago" : `${months}mo ago`;
+}
+
+function pickLatestPeople(people: RecentPerson[], limit = 3) {
+  return [...people]
+    .sort((a, b) => {
+      const aTime = a.lastInteractionAt ? +new Date(a.lastInteractionAt) : 0;
+      const bTime = b.lastInteractionAt ? +new Date(b.lastInteractionAt) : 0;
+      return bTime - aTime;
+    })
+    .slice(0, limit);
 }
 
 function AccountAvatar({ account, size = "default" }: { account: Account | null; size?: "default" | "sm" }) {
@@ -117,6 +154,7 @@ function SidebarAccountBar({ account }: { account: Account | null }) {
 export function Dashboard() {
   const [quickNote, setQuickNote] = useState("");
   const [recentNotes, setRecentNotes] = useState<RecentNote[]>([]);
+  const [latestPeople, setLatestPeople] = useState<RecentPerson[]>([]);
   const [mindMap, setMindMap] = useState<MindMapData | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
   const [saved, setSaved] = useState(false);
@@ -142,10 +180,11 @@ export function Dashboard() {
     let ignore = false;
 
     async function loadDashboardState() {
-      const [notesResponse, mindMapResponse, sessionResponse] = await Promise.all([
+      const [notesResponse, mindMapResponse, sessionResponse, peopleResponse] = await Promise.all([
         fetch("/api/notes"),
         fetch("/api/mind-map"),
         fetch("/api/auth/session"),
+        fetch("/api/people"),
       ]);
 
       if (notesResponse.ok) {
@@ -161,6 +200,11 @@ export function Dashboard() {
       if (sessionResponse.ok) {
         const data = (await sessionResponse.json()) as { user?: Account };
         if (!ignore) setAccount(data.user?.email ? data.user : null);
+      }
+
+      if (peopleResponse.ok) {
+        const data = (await peopleResponse.json()) as { people?: RecentPerson[] };
+        if (!ignore) setLatestPeople(pickLatestPeople(data.people ?? [], 3));
       }
     }
 
@@ -384,6 +428,54 @@ export function Dashboard() {
           </div>
 
           <div className="grid gap-5">
+            <Card className="border-[#e2dfd4] bg-[#faf9f5]/95 p-6">
+              <CardHeader>
+                <CardTitle>people on your mind</CardTitle>
+                <Link href="/people" className="text-xs text-primary hover:underline">
+                  all people
+                </Link>
+              </CardHeader>
+              {latestPeople.length > 0 ? (
+                <ul className="mt-2 divide-y divide-[#e4e1d7]">
+                  {latestPeople.map((person) => (
+                    <li key={person.id}>
+                      <Link
+                        href={`/people/${person.id}`}
+                        className="-mx-1 flex items-center gap-3 rounded-[8px] px-1 py-3 transition-colors hover:bg-secondary/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <Avatar className="size-9 border border-[#e4e1d7]">
+                          <AvatarFallback className="bg-[#efece3] text-[11px] text-olive">
+                            {personInitials(person.name) || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm text-foreground">{person.name}</p>
+                          <p className="truncate text-[11px] text-stone">
+                            {person.relationship ? `${person.relationship} · ` : null}
+                            {person.interactionCount} {person.interactionCount === 1 ? "note" : "notes"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-[11px] text-stone/70">
+                          {relativePersonTime(person.lastInteractionAt)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="mt-6">
+                  <p className="font-hand text-[17px] leading-7 text-olive">no one here yet.</p>
+                  <Link
+                    href="/people"
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                  >
+                    <Users className="size-3.5" strokeWidth={1.5} />
+                    add someone
+                  </Link>
+                </div>
+              )}
+            </Card>
+
             <Card id="threads" className="p-6">
               <CardHeader>
                 <CardTitle>thought threads</CardTitle>
