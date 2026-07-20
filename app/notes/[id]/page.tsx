@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { auth } from "@/auth";
+import { NoteEditor } from "@/components/note-editor";
 import { ensureUser, getNoteById } from "@/db/queries";
 
 type NotePageProps = {
@@ -61,9 +62,7 @@ export default async function NotePage({ params }: NotePageProps) {
             <p className="mt-4 text-sm text-stone">{formatNoteDate(note.createdAt)}</p>
           </header>
 
-          <div className="max-w-[760px] whitespace-pre-wrap pt-10 text-[22px] leading-10 text-foreground">
-            {note.body}
-          </div>
+          <NoteEditor id={note.id} initialBody={note.body} />
         </article>
       </div>
     </main>

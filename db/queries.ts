@@ -298,6 +298,36 @@ export function getNoteById(userId: string, noteId: string) {
   });
 }
 
+export async function updateNote(input: { userId: string; noteId: string; body: string }) {
+  const body = input.body.trim();
+  if (!body) throw new Error("A note cannot be empty.");
+
+  const existing = await getNoteById(input.userId, input.noteId);
+  if (!existing) return null;
+
+  await db
+    .update(notes)
+    .set({
+      body,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(notes.userId, input.userId),
+        eq(notes.id, input.noteId),
+      ),
+    );
+
+  await db.delete(notesToThreads).where(eq(notesToThreads.noteId, input.noteId));
+  await connectNoteToThreads({
+    id: input.noteId,
+    userId: input.userId,
+    body,
+  });
+
+  return getNoteById(input.userId, input.noteId);
+}
+
 export function getReflection(userId: string, writtenFor: string) {
   return db.query.notes.findFirst({
     where: and(
