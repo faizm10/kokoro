@@ -16,11 +16,11 @@ import { cacheSignedIn } from "@/lib/auth-cache";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { label: "today", icon: Feather },
-  { label: "journal", icon: BookOpen },
-  { label: "threads", icon: Network },
-  { label: "archive", icon: Archive },
-  { label: "settings", icon: Settings },
+  { label: "today", icon: Feather, href: "#today" },
+  { label: "journal", icon: BookOpen, href: "#journal" },
+  { label: "threads", icon: Network, href: "#threads" },
+  { label: "archive", icon: Archive, href: "#archive" },
+  { label: "settings", icon: Settings, href: "/settings" },
 ];
 
 type RecentNote = {
@@ -333,19 +333,28 @@ export function Dashboard() {
           <SidebarAccountBar account={account} />
         </div>
         <nav aria-label="Primary" className="mt-8 space-y-1">
-          {navItems.map(({ label, icon: Icon }, index) => (
-            <a
-              key={label}
-              href={label === "today" ? "#today" : `#${label}`}
-              className={cn(
-                "flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-sm transition-colors",
-                index === 0 ? "bg-secondary text-foreground" : "text-stone hover:bg-secondary/60 hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4" strokeWidth={1.5} />
-              {label}
-            </a>
-          ))}
+          {navItems.map(({ label, icon: Icon, href }, index) => {
+            const className = cn(
+              "flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-sm transition-colors",
+              index === 0 ? "bg-secondary text-foreground" : "text-stone hover:bg-secondary/60 hover:text-foreground",
+            );
+
+            if (href.startsWith("/")) {
+              return (
+                <Link key={label} href={href} className={className}>
+                  <Icon className="size-4" strokeWidth={1.5} />
+                  {label}
+                </Link>
+              );
+            }
+
+            return (
+              <a key={label} href={href} className={className}>
+                <Icon className="size-4" strokeWidth={1.5} />
+                {label}
+              </a>
+            );
+          })}
           <Link
             href="/people"
             className="flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-sm text-stone transition-colors hover:bg-secondary/60 hover:text-foreground"

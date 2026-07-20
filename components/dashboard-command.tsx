@@ -96,7 +96,7 @@ export function DashboardCommandPalette({
             <Archive strokeWidth={1.5} />
             <span>Go to archive</span>
           </CommandItem>
-          <CommandItem onSelect={() => run(() => goToHash("#settings"))}>
+          <CommandItem onSelect={() => run(() => router.push("/settings"))}>
             <Settings strokeWidth={1.5} />
             <span>Go to settings</span>
           </CommandItem>
