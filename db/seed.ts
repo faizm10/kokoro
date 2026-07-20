@@ -14,7 +14,7 @@ import {
   users,
 } from "./schema";
 
-const sqlite = new Database(process.env.DATABASE_URL ?? "./data/kokoro.db");
+const sqlite = new Database(process.env.DATABASE_URL || "./data/kokoro.db");
 sqlite.pragma("foreign_keys = ON");
 
 const db = drizzle(sqlite);
