@@ -1,20 +1,20 @@
 import { relations, sql } from "drizzle-orm";
-import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
-export const users = sqliteTable("users", {
+const timestamps = {
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+};
+
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name"),
   image: text("image"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+  ...timestamps,
 });
 
-export const notes = sqliteTable(
+export const notes = pgTable(
   "notes",
   {
     id: text("id").primaryKey(),
@@ -22,14 +22,9 @@ export const notes = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
-    kind: text("kind", { enum: ["quick", "reflection"] }).notNull().default("quick"),
+    kind: text("kind").$type<"quick" | "reflection">().notNull().default("quick"),
     writtenFor: text("written_for"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    ...timestamps,
   },
   (table) => [
     index("notes_user_created_idx").on(table.userId, table.createdAt),
@@ -37,7 +32,7 @@ export const notes = sqliteTable(
   ],
 );
 
-export const threads = sqliteTable(
+export const threads = pgTable(
   "threads",
   {
     id: text("id").primaryKey(),
@@ -46,17 +41,12 @@ export const threads = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    ...timestamps,
   },
   (table) => [index("threads_user_idx").on(table.userId)],
 );
 
-export const notesToThreads = sqliteTable(
+export const notesToThreads = pgTable(
   "notes_to_threads",
   {
     noteId: text("note_id")
@@ -70,7 +60,7 @@ export const notesToThreads = sqliteTable(
   (table) => [primaryKey({ columns: [table.noteId, table.threadId] })],
 );
 
-export const insights = sqliteTable(
+export const insights = pgTable(
   "insights",
   {
     id: text("id").primaryKey(),
@@ -79,14 +69,12 @@ export const insights = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
     sourceNoteCount: integer("source_note_count").notNull().default(0),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("insights_user_created_idx").on(table.userId, table.createdAt)],
 );
 
-export const people = sqliteTable(
+export const people = pgTable(
   "people",
   {
     id: text("id").primaryKey(),
@@ -96,20 +84,15 @@ export const people = sqliteTable(
     name: text("name").notNull(),
     relationship: text("relationship"),
     howWeMet: text("how_we_met"),
-    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
-    // My own, hand-written understanding of the relationship — never AI-generated.
+    tags: jsonb("tags").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    // My own, hand-written understanding of the relationship - never AI-generated.
     summary: text("summary"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    ...timestamps,
   },
   (table) => [index("people_user_idx").on(table.userId)],
 );
 
-export const interactions = sqliteTable(
+export const interactions = pgTable(
   "interactions",
   {
     id: text("id").primaryKey(),
@@ -119,26 +102,19 @@ export const interactions = sqliteTable(
     personId: text("person_id")
       .notNull()
       .references(() => people.id, { onDelete: "cascade" }),
-    occurredAt: integer("occurred_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
     context: text("context"),
     // Where the information came from, e.g. "in-person conversation", "message they sent me".
     source: text("source").notNull().default("in-person conversation"),
-    // Directly stated information — what they actually said or did.
+    // Directly stated information - what they actually said or did.
     facts: text("facts").notNull(),
-    // My own interpretation — kept separate from facts on purpose.
+    // My own interpretation - kept separate from facts on purpose.
     interpretation: text("interpretation"),
-    topics: text("topics", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
-    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+    topics: jsonb("topics").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    tags: jsonb("tags").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
     followUp: text("follow_up"),
-    followUpDone: integer("follow_up_done", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    followUpDone: boolean("follow_up_done").notNull().default(false),
+    ...timestamps,
   },
   (table) => [
     index("interactions_person_occurred_idx").on(table.personId, table.occurredAt),
@@ -146,7 +122,7 @@ export const interactions = sqliteTable(
   ],
 );
 
-export const importantDates = sqliteTable(
+export const importantDates = pgTable(
   "important_dates",
   {
     id: text("id").primaryKey(),
@@ -160,9 +136,7 @@ export const importantDates = sqliteTable(
     // Stored as an ISO date string (YYYY-MM-DD); may recur yearly (e.g. a birthday).
     dateText: text("date_text").notNull(),
     note: text("note"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("important_dates_person_idx").on(table.personId)],
 );

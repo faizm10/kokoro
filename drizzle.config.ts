@@ -1,10 +1,10 @@
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  dialect: "sqlite",
+  dialect: "postgresql",
   schema: "./db/schema.ts",
   out: "./db/migrations",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "./data/kokoro.db",
+    url: process.env.DATABASE_URL || process.env.POSTGRES_URL || "",
   },
 });
