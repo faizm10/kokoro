@@ -26,6 +26,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { cacheSignedIn } from "@/lib/auth-cache";
 
 type RecentNote = {
   id: string;
@@ -63,6 +64,11 @@ export function DashboardCommandPalette({
   function run(action: () => void) {
     onOpenChange(false);
     action();
+  }
+
+  function handleSignOut() {
+    cacheSignedIn(false);
+    void signOut({ callbackUrl: "/" });
   }
 
   return (
@@ -120,7 +126,7 @@ export function DashboardCommandPalette({
             <span>Save quick note</span>
             <CommandShortcut>⌘↵</CommandShortcut>
           </CommandItem>
-          <CommandItem onSelect={() => run(() => void signOut({ callbackUrl: "/" }))}>
+          <CommandItem onSelect={() => run(handleSignOut)}>
             <LogOut strokeWidth={1.5} />
             <span>Sign out</span>
           </CommandItem>

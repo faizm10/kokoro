@@ -1,20 +1,49 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowDown } from "lucide-react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
 import { GoogleMark } from "@/components/google-mark";
 import { TypingAnimation } from "@/components/ui/typing-animation";
+import { cacheSignedIn, readCachedSignedIn } from "@/lib/auth-cache";
 
 function signInWithGoogle() {
   void signIn("google", { redirectTo: "/dashboard" });
 }
 
-export function Landing() {
+export function Landing({ initialIsSignedIn }: { initialIsSignedIn: boolean }) {
   const searchParams = useSearchParams();
   const hasError = Boolean(searchParams.get("error"));
+  const [isSignedIn, setIsSignedIn] = useState(initialIsSignedIn);
+
+  useEffect(() => {
+    if (initialIsSignedIn) {
+      cacheSignedIn(true);
+      return;
+    }
+
+    if (readCachedSignedIn()) {
+      setIsSignedIn(true);
+    }
+
+    async function refreshSignedInState() {
+      const response = await fetch("/api/auth/session", {
+        cache: "no-store",
+      }).catch(() => null);
+      if (!response?.ok) return;
+
+      const data = (await response.json()) as { user?: { email?: string | null } };
+      const nextIsSignedIn = Boolean(data.user?.email);
+      cacheSignedIn(nextIsSignedIn);
+      setIsSignedIn(nextIsSignedIn);
+    }
+
+    void refreshSignedInState();
+  }, [initialIsSignedIn]);
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-16">
@@ -63,14 +92,23 @@ export function Landing() {
           transition={{ delay: 2.85, duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
           className="mt-12 flex w-full max-w-[360px] flex-col items-center"
         >
-          <button
-            type="button"
-            onClick={signInWithGoogle}
-            className="flex h-14 w-full cursor-pointer items-center justify-center gap-3 rounded-[10px] bg-primary px-5 text-[15px] font-medium text-primary-foreground shadow-[0_10px_30px_rgba(20,20,19,0.18)] transition-colors hover:bg-[#152d50] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f4ed]"
-          >
-            <GoogleMark />
-            continue with google
-          </button>
+          {isSignedIn ? (
+            <Link
+              href="/dashboard"
+              className="flex h-14 w-full cursor-pointer items-center justify-center rounded-[10px] bg-primary px-5 text-[15px] font-medium text-primary-foreground shadow-[0_10px_30px_rgba(20,20,19,0.18)] transition-colors hover:bg-[#152d50] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f4ed]"
+            >
+              open journal
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={signInWithGoogle}
+              className="flex h-14 w-full cursor-pointer items-center justify-center gap-3 rounded-[10px] bg-primary px-5 text-[15px] font-medium text-primary-foreground shadow-[0_10px_30px_rgba(20,20,19,0.18)] transition-colors hover:bg-[#152d50] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f4ed]"
+            >
+              <GoogleMark />
+              continue with google
+            </button>
+          )}
           {hasError ? (
             <p role="alert" className="mt-4 text-xs text-error [text-shadow:0_1px_12px_rgba(245,244,237,0.9)]">
               sign in could not be completed. please try again.

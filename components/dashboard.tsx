@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { cacheSignedIn } from "@/lib/auth-cache";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -126,6 +127,11 @@ function AccountAvatar({ account, size = "default" }: { account: Account | null;
 }
 
 function SidebarAccountBar({ account }: { account: Account | null }) {
+  function handleSignOut() {
+    cacheSignedIn(false);
+    void signOut({ callbackUrl: "/" });
+  }
+
   return (
     <div className="rounded-[8px] border border-border bg-background/45 p-3">
       <p className="mb-3 text-[11px] tracking-[0.08em] text-stone/70">ACCOUNT</p>
@@ -138,7 +144,7 @@ function SidebarAccountBar({ account }: { account: Account | null }) {
           </div>
           <button
             type="button"
-            onClick={() => void signOut({ callbackUrl: "/" })}
+            onClick={handleSignOut}
             aria-label="Sign out"
             className="rounded-md p-2 text-stone transition-colors hover:bg-secondary hover:text-foreground"
           >
@@ -213,7 +219,9 @@ export function Dashboard() {
 
       if (sessionResponse.ok) {
         const data = (await sessionResponse.json()) as { user?: Account };
-        if (!ignore) setAccount(data.user?.email ? data.user : null);
+        const nextAccount = data.user?.email ? data.user : null;
+        cacheSignedIn(Boolean(nextAccount));
+        if (!ignore) setAccount(nextAccount);
       }
 
       if (peopleResponse.ok) {
