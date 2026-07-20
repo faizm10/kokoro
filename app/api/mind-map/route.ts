@@ -1,21 +1,7 @@
-import { auth } from "@/auth";
-import { ensureUser, getMindMap } from "@/db/queries";
+import { getMindMap } from "@/db/queries";
+import { getCurrentUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
-
-async function getCurrentUser() {
-  const session = await auth();
-
-  if (!session?.user?.email) {
-    return null;
-  }
-
-  return ensureUser({
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  });
-}
 
 export async function GET() {
   const user = await getCurrentUser();

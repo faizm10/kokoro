@@ -54,6 +54,13 @@ function formatDashboardDate(date: Date) {
   };
 }
 
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function formatRecentNoteTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -153,6 +160,8 @@ function SidebarAccountBar({ account }: { account: Account | null }) {
 
 export function Dashboard() {
   const [quickNote, setQuickNote] = useState("");
+  const [reflection, setReflection] = useState("");
+  const [reflectionStatus, setReflectionStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [recentNotes, setRecentNotes] = useState<RecentNote[]>([]);
   const [latestPeople, setLatestPeople] = useState<RecentPerson[]>([]);
   const [mindMap, setMindMap] = useState<MindMapData | null>(null);
@@ -161,8 +170,12 @@ export function Dashboard() {
   const [saving, setSaving] = useState(false);
   const [noteError, setNoteError] = useState("");
   const quickNoteRef = useRef<HTMLTextAreaElement | null>(null);
+  const reflectionLoadedRef = useRef(false);
+  const lastSavedReflectionRef = useRef("");
   const { open: commandOpen, setOpen: setCommandOpen } = useDashboardCommandPalette();
-  const today = formatDashboardDate(new Date());
+  const todayDate = new Date();
+  const today = formatDashboardDate(todayDate);
+  const todayKey = formatDateKey(todayDate);
 
   function focusQuickNote() {
     quickNoteRef.current?.focus();
@@ -180,11 +193,12 @@ export function Dashboard() {
     let ignore = false;
 
     async function loadDashboardState() {
-      const [notesResponse, mindMapResponse, sessionResponse, peopleResponse] = await Promise.all([
+      const [notesResponse, mindMapResponse, sessionResponse, peopleResponse, reflectionResponse] = await Promise.all([
         fetch("/api/notes"),
         fetch("/api/mind-map"),
         fetch("/api/auth/session"),
         fetch("/api/people"),
+        fetch(`/api/reflections?writtenFor=${todayKey}`),
       ]);
 
       if (notesResponse.ok) {
@@ -206,6 +220,20 @@ export function Dashboard() {
         const data = (await peopleResponse.json()) as { people?: RecentPerson[] };
         if (!ignore) setLatestPeople(pickLatestPeople(data.people ?? [], 3));
       }
+
+      if (reflectionResponse.ok) {
+        const data = (await reflectionResponse.json()) as { reflection?: { body: string } | null };
+        const body = data.reflection?.body ?? "";
+        if (!ignore) {
+          lastSavedReflectionRef.current = body;
+          setReflection(body);
+          reflectionLoadedRef.current = true;
+          setReflectionStatus("idle");
+        }
+      } else if (!ignore) {
+        reflectionLoadedRef.current = true;
+        setReflectionStatus("error");
+      }
     }
 
     void loadDashboardState();
@@ -213,7 +241,37 @@ export function Dashboard() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [todayKey]);
+
+  useEffect(() => {
+    if (!reflectionLoadedRef.current || reflection === lastSavedReflectionRef.current) return;
+
+    setReflectionStatus("saving");
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/reflections", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            body: reflection,
+            writtenFor: todayKey,
+          }),
+        });
+
+        if (!response.ok) throw new Error("Reflection could not be saved.");
+
+        lastSavedReflectionRef.current = reflection;
+        setReflectionStatus("saved");
+        window.setTimeout(() => setReflectionStatus("idle"), 1600);
+      } catch {
+        setReflectionStatus("error");
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [reflection, todayKey]);
 
   async function saveQuickNote() {
     const body = quickNote.trim();
@@ -411,11 +469,21 @@ export function Dashboard() {
                 <span className="font-hand text-sm text-stone">take your time</span>
               </CardHeader>
               <Textarea
+                value={reflection}
+                onChange={(event) => setReflection(event.target.value)}
                 placeholder="Start wherever you are..."
                 aria-label="Today's reflection"
                 className="mt-8 min-h-[230px] leading-8"
               />
-              <div className="border-t border-border pt-4 text-right text-[11px] text-stone/70">saved as you write</div>
+              <div className="border-t border-border pt-4 text-right text-[11px] text-stone/70">
+                {reflectionStatus === "saving"
+                  ? "saving..."
+                  : reflectionStatus === "saved"
+                    ? "saved"
+                    : reflectionStatus === "error"
+                      ? "could not save"
+                      : "saved as you write"}
+              </div>
             </Card>
 
             <Card className="p-6 sm:p-7">

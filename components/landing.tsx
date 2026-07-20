@@ -66,7 +66,7 @@ export function Landing() {
           <button
             type="button"
             onClick={signInWithGoogle}
-            className="flex h-14 w-full items-center justify-center gap-3 rounded-[10px] bg-primary px-5 text-[15px] font-medium text-primary-foreground shadow-[0_10px_30px_rgba(20,20,19,0.18)] transition-colors hover:bg-[#152d50] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f4ed]"
+            className="flex h-14 w-full cursor-pointer items-center justify-center gap-3 rounded-[10px] bg-primary px-5 text-[15px] font-medium text-primary-foreground shadow-[0_10px_30px_rgba(20,20,19,0.18)] transition-colors hover:bg-[#152d50] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f4ed]"
           >
             <GoogleMark />
             continue with google

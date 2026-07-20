@@ -1,5 +1,5 @@
-import { auth } from "@/auth";
-import { createNote, ensureUser, getRecentNotes } from "@/db/queries";
+import { createNote, getRecentNotes } from "@/db/queries";
+import { getCurrentUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -25,22 +25,6 @@ function serializeNote(note: {
     writtenFor: note.writtenFor,
     createdAt: note.createdAt.toISOString(),
   };
-}
-
-async function getCurrentUser() {
-  const session = await auth();
-
-  if (!session?.user?.email) {
-    return null;
-  }
-
-  const profile = {
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  };
-
-  return ensureUser(profile);
 }
 
 async function getSerializedRecentNotes(userId: string) {

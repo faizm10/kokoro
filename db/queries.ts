@@ -308,6 +308,37 @@ export function getReflection(userId: string, writtenFor: string) {
   });
 }
 
+export async function saveReflection(input: { userId: string; writtenFor: string; body: string }) {
+  const existing = await getReflection(input.userId, input.writtenFor);
+
+  if (existing) {
+    await db
+      .update(notes)
+      .set({
+        body: input.body,
+        updatedAt: new Date(),
+      })
+      .where(eq(notes.id, existing.id));
+
+    return {
+      ...existing,
+      body: input.body,
+      updatedAt: new Date(),
+    };
+  }
+
+  const reflection = {
+    id: randomUUID(),
+    userId: input.userId,
+    body: input.body,
+    kind: "reflection" as const,
+    writtenFor: input.writtenFor,
+  };
+
+  await db.insert(notes).values(reflection);
+  return reflection;
+}
+
 export function getThreads(userId: string) {
   return db.query.threads.findMany({
     where: eq(threads.userId, userId),
