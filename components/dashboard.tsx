@@ -328,7 +328,12 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-[rgba(245,244,237,0.82)]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[216px] border-r border-border bg-[#f1f0e9] px-6 py-8 lg:flex lg:flex-col">
-        <p className="font-hand text-xl text-olive">kokoro</p>
+        <Link
+          href="/"
+          className="font-hand text-xl text-olive transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          kokoro
+        </Link>
         <div className="mt-8">
           <SidebarAccountBar account={account} />
         </div>
@@ -379,7 +384,12 @@ export function Dashboard() {
       </aside>
 
       <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/95 px-5 lg:hidden">
-        <p className="font-hand text-xl text-olive">kokoro</p>
+        <Link
+          href="/"
+          className="font-hand text-xl text-olive transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          kokoro
+        </Link>
         <div className="flex items-center gap-2">
           <button
             type="button"
