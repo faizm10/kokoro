@@ -16,7 +16,7 @@ type MindMapNote = {
 type MindMapThread = {
   id: string;
   name: string;
-  kind: "theme" | "who" | "event";
+  kind: "theme" | "who" | "event" | "place" | "emotion";
   description: string | null;
   noteCount: number;
   notes: MindMapNote[];
@@ -45,7 +45,17 @@ const kindFilters = [
   { label: "all", value: "all" },
   { label: "themes", value: "theme" },
   { label: "people", value: "who" },
+  { label: "places", value: "place" },
   { label: "events", value: "event" },
+  { label: "moods", value: "emotion" },
+] as const;
+
+const overviewKinds = [
+  { label: "themes", value: "theme" },
+  { label: "people", value: "who" },
+  { label: "places", value: "place" },
+  { label: "events", value: "event" },
+  { label: "moods", value: "emotion" },
 ] as const;
 
 function truncateLabel(value: string, length = 18) {
@@ -66,6 +76,22 @@ function getThreadStyle(kind: MindMapThread["kind"]) {
       fill: "#7a6a48",
       stroke: "#faf9f5",
       label: "event",
+    };
+  }
+
+  if (kind === "place") {
+    return {
+      fill: "#2f6551",
+      stroke: "#faf9f5",
+      label: "place",
+    };
+  }
+
+  if (kind === "emotion") {
+    return {
+      fill: "#8f4f5f",
+      stroke: "#faf9f5",
+      label: "mood",
     };
   }
 
@@ -341,17 +367,17 @@ export function MindMap({ data }: { data?: MindMapData | null }) {
               <p className="mt-3 text-sm leading-6 text-stone">
                 {threads.length} active {threads.length === 1 ? "thread" : "threads"} from recent notes.
               </p>
-              <div className="mt-5 grid grid-cols-3 gap-2">
-                {(["theme", "who", "event"] as const).map((kind) => (
+              <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+                {overviewKinds.map((kind) => (
                   <button
-                    key={kind}
+                    key={kind.value}
                     type="button"
-                    onClick={() => setActiveKind(kind)}
+                    onClick={() => setActiveKind(kind.value)}
                     className="rounded-[8px] border border-[#e4e1d7] bg-background/60 px-2 py-2 text-left transition-colors hover:bg-secondary"
                   >
-                    <span className="block text-[10px] uppercase tracking-[0.06em] text-stone">{kind}</span>
+                    <span className="block text-[10px] uppercase tracking-[0.06em] text-stone">{kind.label}</span>
                     <span className="mt-1 block text-sm text-foreground">
-                      {threads.filter((thread) => thread.kind === kind).length}
+                      {threads.filter((thread) => thread.kind === kind.value).length}
                     </span>
                   </button>
                 ))}
