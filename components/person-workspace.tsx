@@ -38,6 +38,7 @@ import type { ImportantDateDTO, InteractionDTO, PersonDetailDTO } from "@/lib/se
 import { cn } from "@/lib/utils";
 
 const SOURCE_OPTIONS = [
+  "observation",
   "in-person conversation",
   "message they sent me",
   "phone call",
@@ -159,6 +160,8 @@ function InteractionForm({
   submitting: boolean;
   submitLabel: string;
 }) {
+  const isObservation = draft.source === "observation";
+
   function handle(event: FormEvent) {
     event.preventDefault();
     onSubmit();
@@ -196,28 +199,32 @@ function InteractionForm({
       </div>
 
       <div>
-        <Label className={labelClass}>where / why, if it helps</Label>
+        <Label className={labelClass}>{isObservation ? "where you noticed it" : "where / why, if it helps"}</Label>
         <Input
           className={fieldClass}
           value={draft.context}
           onChange={(e) => setDraft((d) => ({ ...d, context: e.target.value }))}
-          placeholder="over coffee, after class…"
+          placeholder={isObservation ? "at work, in class, on a walk…" : "over coffee, after class…"}
         />
       </div>
 
       <div>
-        <Label className={labelClass}>what they said or did</Label>
-        <p className="mb-2 text-[12px] text-stone/65">stick to what actually happened — this is the note itself.</p>
+        <Label className={labelClass}>{isObservation ? "what you observed" : "what they said or did"}</Label>
+        <p className="mb-2 text-[12px] text-stone/65">
+          {isObservation
+            ? "write only what you noticed directly — behavior, patterns, preferences, or context."
+            : "stick to what actually happened — this is the note itself."}
+        </p>
         <Textarea
           value={draft.facts}
           onChange={(e) => setDraft((d) => ({ ...d, facts: e.target.value }))}
-          placeholder="write freely…"
+          placeholder={isObservation ? "they seemed energized after talking about…" : "write freely…"}
           className={ruledArea}
         />
       </div>
 
       <div>
-        <Label className={labelClass}>your private read</Label>
+        <Label className={labelClass}>{isObservation ? "what it might mean to you" : "your private read"}</Label>
         <p className="mb-2 text-[12px] text-stone/65">optional. kept separate from the facts on purpose.</p>
         <Textarea
           value={draft.interpretation}
@@ -564,6 +571,14 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
     "Summarize what I've learned.",
   ];
 
+  function openAddForm(source = SOURCE_OPTIONS[0]) {
+    setAddDraft({
+      ...emptyDraft(),
+      source,
+    });
+    setAdding(true);
+  }
+
   return (
     <main className="min-h-screen bg-[rgba(245,244,237,0.72)] px-5 py-8 sm:px-8 sm:py-12">
       <div className="mx-auto max-w-[1180px]">
@@ -715,10 +730,21 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                   <CardTitle className="font-hand text-base font-normal text-olive">timeline</CardTitle>
                   <p className="mt-1 text-[12px] text-stone/70">entries in the order you lived them</p>
                 </div>
-                <Button type="button" variant="secondary" onClick={() => setAdding((v) => !v)}>
-                  <Plus className="size-4" strokeWidth={1.5} />
-                  {adding ? "close" : "add entry"}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" onClick={() => (adding ? setAdding(false) : openAddForm())}>
+                    <Plus className="size-4" strokeWidth={1.5} />
+                    {adding ? "close" : "add entry"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="border border-border bg-background/50"
+                    onClick={() => openAddForm("observation")}
+                  >
+                    <Pencil className="size-4" strokeWidth={1.5} />
+                    observation
+                  </Button>
+                </div>
               </CardHeader>
 
               <AnimatePresence initial={false}>
@@ -736,7 +762,7 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
                         onSubmit={handleAdd}
                         onCancel={() => setAdding(false)}
                         submitting={addSaving}
-                        submitLabel="save entry"
+                        submitLabel={addDraft.source === "observation" ? "save observation" : "save entry"}
                       />
                       {addError ? <p className="mt-2 text-xs text-error">{addError}</p> : null}
                     </div>
