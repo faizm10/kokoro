@@ -3,6 +3,7 @@
 import { type FormEvent, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Activity,
   ArrowLeft,
   CalendarDays,
   Check,
@@ -353,6 +354,82 @@ function AssistantAnswerView({
 
 type ChatTurn = { id: string; question: string; answer: AssistantAnswer | null };
 
+type AnalysisEntry = Pick<
+  InteractionDTO,
+  "occurredAt" | "source" | "facts" | "interpretation" | "topics" | "tags" | "followUp" | "followUpDone"
+> & {
+  isDraft?: boolean;
+};
+
+function plural(count: number, singular: string, pluralLabel = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : pluralLabel}`;
+}
+
+function countWords(value: string) {
+  return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function increment(map: Map<string, number>, key: string, amount = 1) {
+  const clean = key.trim().toLowerCase();
+  if (!clean) return;
+  map.set(clean, (map.get(clean) ?? 0) + amount);
+}
+
+function topEntries(map: Map<string, number>, limit: number) {
+  return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, limit);
+}
+
+function buildLiveAnalysis(entries: AnalysisEntry[]) {
+  const sorted = [...entries].sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt));
+  const sourceCounts = new Map<string, number>();
+  const topicCounts = new Map<string, number>();
+  let observationCount = 0;
+  let openFollowUps = 0;
+  let interpretedCount = 0;
+  let wordCount = 0;
+
+  for (const entry of sorted) {
+    increment(sourceCounts, entry.source);
+    if (entry.source === "observation") observationCount += 1;
+    if (entry.followUp && !entry.followUpDone) openFollowUps += 1;
+    if (entry.interpretation?.trim()) interpretedCount += 1;
+    wordCount += countWords(entry.facts);
+    for (const topic of entry.topics) increment(topicCounts, topic);
+    for (const tag of entry.tags) increment(topicCounts, tag);
+  }
+
+  const dates = sorted.map((entry) => new Date(entry.occurredAt).getTime()).filter((time) => !Number.isNaN(time));
+  const newest = dates[0] ?? null;
+  const oldest = dates[dates.length - 1] ?? null;
+  const spanDays = newest && oldest ? Math.max(1, Math.ceil((newest - oldest) / 86_400_000) + 1) : 1;
+  const avgGap = sorted.length > 1 ? Math.max(1, Math.round(spanDays / (sorted.length - 1))) : null;
+  const topTopics = topEntries(topicCounts, 5);
+  const topSources = topEntries(sourceCounts, 4);
+  const primaryTopic = topTopics[0]?.[0] ?? null;
+  const primarySource = topSources[0]?.[0] ?? null;
+  const signals = [
+    sorted.length > 0 ? plural(sorted.length, "entry", "entries") : "no entries yet",
+    observationCount > 0 ? plural(observationCount, "observation") : "no observations yet",
+    primaryTopic ? `top topic: ${primaryTopic}` : "no topics yet",
+    openFollowUps > 0 ? `${openFollowUps} open follow-up${openFollowUps === 1 ? "" : "s"}` : "no open follow-ups",
+  ];
+
+  return {
+    avgGap,
+    interpretedCount,
+    observationCount,
+    openFollowUps,
+    primarySource,
+    signals,
+    sorted,
+    spanDays,
+    topSources,
+    topTopics,
+    totalEntries: sorted.length,
+    wordCount,
+  };
+}
+
 export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetailDTO }) {
   const [person, setPerson] = useState(initialPerson);
   const [adding, setAdding] = useState(false);
@@ -405,6 +482,32 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
     () => person.interactions.filter((i) => i.followUp && !i.followUpDone),
     [person.interactions],
   );
+
+  const liveEntries = useMemo<AnalysisEntry[]>(() => {
+    const draftFacts = addDraft.facts.trim();
+    const draftEntry: AnalysisEntry[] =
+      adding && draftFacts
+        ? [
+            {
+              occurredAt: addDraft.occurredAt
+                ? new Date(addDraft.occurredAt).toISOString()
+                : new Date().toISOString(),
+              source: addDraft.source,
+              facts: addDraft.facts,
+              interpretation: addDraft.interpretation || null,
+              topics: parseCsv(addDraft.topics),
+              tags: parseCsv(addDraft.tags),
+              followUp: addDraft.followUp || null,
+              followUpDone: false,
+              isDraft: true,
+            },
+          ]
+        : [];
+
+    return [...draftEntry, ...person.interactions];
+  }, [addDraft, adding, person.interactions]);
+
+  const liveAnalysis = useMemo(() => buildLiveAnalysis(liveEntries), [liveEntries]);
 
   const allSources = useMemo(
     () => [...new Set(person.interactions.map((i) => i.source))],
@@ -946,6 +1049,116 @@ export function PersonWorkspace({ initialPerson }: { initialPerson: PersonDetail
 
           {/* Right rail */}
           <div className="grid gap-5">
+            {/* Live analysis */}
+            <Card className="border-[#d8d5cb] bg-[#fbfaf6] p-6">
+              <CardHeader>
+                <div>
+                  <CardTitle>live analysis</CardTitle>
+                  <p className="mt-1 text-[12px] text-stone/70">
+                    {adding && addDraft.facts.trim() ? "including current draft" : "from saved entries"}
+                  </p>
+                </div>
+                <Activity className="size-4 text-primary" strokeWidth={1.5} />
+              </CardHeader>
+
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <div className="rounded-[8px] border border-[#e4e1d7] bg-background/60 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.06em] text-stone">entries</p>
+                  <p className="mt-1 text-lg text-foreground">{liveAnalysis.totalEntries}</p>
+                </div>
+                <div className="rounded-[8px] border border-[#e4e1d7] bg-background/60 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.06em] text-stone">observed</p>
+                  <p className="mt-1 text-lg text-foreground">{liveAnalysis.observationCount}</p>
+                </div>
+                <div className="rounded-[8px] border border-[#e4e1d7] bg-background/60 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.06em] text-stone">open</p>
+                  <p className="mt-1 text-lg text-foreground">{liveAnalysis.openFollowUps}</p>
+                </div>
+                <div className="rounded-[8px] border border-[#e4e1d7] bg-background/60 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.06em] text-stone">pace</p>
+                  <p className="mt-1 text-lg text-foreground">
+                    {liveAnalysis.avgGap ? `${liveAnalysis.avgGap}d` : "new"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                {liveAnalysis.signals.map((signal) => (
+                  <p key={signal} className="rounded-[8px] bg-secondary/45 px-3 py-2 text-[12px] leading-5 text-stone">
+                    {signal}
+                  </p>
+                ))}
+              </div>
+
+              {liveAnalysis.topTopics.length > 0 ? (
+                <div className="mt-5">
+                  <p className="text-[11px] uppercase tracking-[0.08em] text-stone/80">topic weight</p>
+                  <div className="mt-3 space-y-2.5">
+                    {liveAnalysis.topTopics.map(([topic, count]) => {
+                      const maxCount = liveAnalysis.topTopics[0]?.[1] ?? 1;
+                      return (
+                        <button
+                          key={topic}
+                          type="button"
+                          onClick={() => setTagFilter((current) => (current === topic ? null : topic))}
+                          className="block w-full text-left"
+                        >
+                          <span className="flex items-center justify-between gap-3 text-[12px] text-foreground">
+                            <span>{topic}</span>
+                            <span className="text-stone">{count}</span>
+                          </span>
+                          <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-[#e4e1d7]">
+                            <span
+                              className="block h-full rounded-full bg-primary/75"
+                              style={{ width: `${Math.max(18, Math.round((count / maxCount) * 100))}%` }}
+                            />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {liveAnalysis.topSources.length > 0 ? (
+                <div className="mt-5">
+                  <p className="text-[11px] uppercase tracking-[0.08em] text-stone/80">source mix</p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {liveAnalysis.topSources.map(([source, count]) => (
+                      <button
+                        key={source}
+                        type="button"
+                        onClick={() => setSourceFilter((current) => (current === source ? null : source))}
+                        className="rounded-full border border-border bg-background/60 px-2.5 py-1 text-[11px] text-stone transition-colors hover:text-foreground"
+                      >
+                        {source} · {count}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {adding ? (
+                <div className="mt-5 border-t border-[#e4e1d7] pt-4">
+                  <p className="text-[11px] uppercase tracking-[0.08em] text-stone/80">current draft</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-[8px] bg-background/60 px-2 py-2">
+                      <p className="text-sm text-foreground">{countWords(addDraft.facts)}</p>
+                      <p className="text-[10px] text-stone">words</p>
+                    </div>
+                    <div className="rounded-[8px] bg-background/60 px-2 py-2">
+                      <p className="text-sm text-foreground">{parseCsv(addDraft.topics).length}</p>
+                      <p className="text-[10px] text-stone">topics</p>
+                    </div>
+                    <div className="rounded-[8px] bg-background/60 px-2 py-2">
+                      <p className="text-sm text-foreground">{parseCsv(addDraft.tags).length}</p>
+                      <p className="text-[10px] text-stone">tags</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </Card>
+
             {/* Assistant */}
             <Card className="p-6">
               <CardHeader>
